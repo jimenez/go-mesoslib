@@ -41,7 +41,10 @@ func (lib *DemoLib) handleEvents(body io.Reader) {
 			if err == io.EOF {
 				break
 			}
-			// FIXME: skip error
+			if event.GetType() == mesosproto.Event_UPDATE {
+				taskStatus := event.GetUpdate().GetStatus()
+				log.Println("Status for", taskStatus.GetTaskId().GetValue(), "is", taskStatus.GetState().String())
+			}
 			continue
 		}
 

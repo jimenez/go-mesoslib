@@ -36,10 +36,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		//		if !hasMoreInLine {
-		//			break
-		//		}
-
 		id := make([]byte, 6)
 		n, err := rand.Read(id)
 		if n != len(id) || err != nil {
