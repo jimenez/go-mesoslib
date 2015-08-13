@@ -107,6 +107,7 @@ func (lib *DemoLib) LaunchTask(offer *mesosproto.Offer, resources []*mesosproto.
 		return err
 	}
 	req.Header.Set("Content-Type", "application/x-protobuf")
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

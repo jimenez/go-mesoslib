@@ -2,6 +2,9 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"log"
 	"os"
@@ -29,14 +32,32 @@ func main() {
 
 	stdin := bufio.NewReader(os.Stdin)
 	for {
-		line, hasMoreInLine, err := bio.ReadLine()
+		line, _, err := stdin.ReadLine()
 		if err != nil {
 			log.Fatal(err)
 		}
-		if !hasMoreInLine {
-			break
+		//		if !hasMoreInLine {
+		//			break
+		//		}
+
+		id := make([]byte, 6)
+		n, err := rand.Read(id)
+		if n != len(id) || err != nil {
+			continue
 		}
 
-		demoLib.LaunchTask(strings.TrimSpace(line))
+		lline := bytes.NewBuffer(line).String()
+		task := lib.Task{
+			ID:      hex.EncodeToString(id),
+			Command: strings.Split(strings.TrimSpace(lline), " "),
+			Image:   "busybox",
+		}
+		offer := offers[0]
+
+		offers = nil
+
+		if err := demoLib.LaunchTask(offer, lib.BuildResources(0.1, 0, 0), &task); err != nil {
+			log.Println(err)
+		}
 	}
 }
