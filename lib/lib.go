@@ -48,7 +48,7 @@ func (lib *DemoLib) handleEvents(s transport.Subscription) {
 }
 
 func (lib *DemoLib) Subscribe() error {
-	s, err := transport.Subscribe(lib.master, lib.frameworkInfo)
+	s, err := transport.Subscribe(lib.master, lib.frameworkInfo, false)
 	if err != nil {
 		return err
 	}

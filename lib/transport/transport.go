@@ -48,11 +48,12 @@ func (t *subscription) Err() error {
 	return t.err
 }
 
-func Subscribe(masterURI string, fi *mesosproto.FrameworkInfo) (Subscription, error) {
+func Subscribe(masterURI string, fi *mesosproto.FrameworkInfo, force bool) (Subscription, error) {
 	call := mesosproto.Call{
 		Type: mesosproto.Call_SUBSCRIBE.Enum(),
 		Subscribe: &mesosproto.Call_Subscribe{
 			FrameworkInfo: fi,
+			Force: &force,
 		},
 	}
 
@@ -165,6 +166,9 @@ func (t *subscription) handleEvents(ctx context.Context) {
 // timedDecoder returns a Decorated decoder that generates the given error if no events
 // are decoded for some number of sequential timeouts. The returned Decoder is not safe
 // to share across goroutines.
+// TODO(jdef) this probably isn't the right place for all of this logic (and it's not
+// just monitoring the heartbeat messages, it's counting all of them..). Heartbeat monitoring
+// has specific requirements. Get rid of this and implement something better elsewhere.
 func timedDecoder(dec records.Decoder, dur time.Duration, timeouts int, err error) records.Decoder {
 	var t *time.Timer
 	return records.DecoderFunc(func(v interface{}) error {
