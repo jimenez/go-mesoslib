@@ -1,16 +1,11 @@
 package lib
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io"
-	"io/ioutil"
 	"log"
-	"net/http"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/jimenez/mesoscon-demo/lib/mesosproto"
+	"github.com/jimenez/mesoscon-demo/lib/transport"
 )
 
 const ENDPOINT = "/master/api/v1/scheduler"
@@ -32,23 +27,13 @@ func New(master, name string) *DemoLib {
 	}
 }
 
-func (lib *DemoLib) handleEvents(body io.Reader) {
-	dec := json.NewDecoder(body)
-	for {
-		var event mesosproto.Event
-
-		if err := dec.Decode(&event); err != nil {
-			if err == io.EOF {
-				break
-			}
-			if event.GetType() == mesosproto.Event_UPDATE {
-				taskStatus := event.GetUpdate().GetStatus()
-				log.Println("Status for", taskStatus.GetTaskId().GetValue(), "is", taskStatus.GetState().String())
-			}
-			continue
-		}
-
+func (lib *DemoLib) handleEvents(s transport.Subscription) {
+	ech := s.Events()
+	for event := range ech {
 		switch event.GetType() {
+		case mesosproto.Event_UPDATE:
+			taskStatus := event.GetUpdate().GetStatus()
+			log.Println("Status for", taskStatus.GetTaskId().GetValue(), "is", taskStatus.GetState().String())
 		case mesosproto.Event_SUBSCRIBED:
 			lib.frameworkID = event.GetSubscribed().GetFrameworkId()
 			log.Println("framework", lib.name, "subscribed succesfully (", lib.frameworkID.String(), ")")
@@ -59,42 +44,15 @@ func (lib *DemoLib) handleEvents(body io.Reader) {
 			log.Println("framework", lib.name, "received", len(event.GetOffers().GetOffers()), "offer(s)")
 		}
 	}
+	log.Println("subscription terminated:", s.Err())
 }
 
 func (lib *DemoLib) Subscribe() error {
-	call := mesosproto.Call{
-		Type: mesosproto.Call_SUBSCRIBE.Enum(),
-		Subscribe: &mesosproto.Call_Subscribe{
-			FrameworkInfo: lib.frameworkInfo,
-		},
-	}
-
-	body, err := proto.Marshal(&call)
+	s, err := transport.Subscribe(lib.master, lib.frameworkInfo)
 	if err != nil {
 		return err
 	}
-
-	req, err := http.NewRequest("POST", "http://"+lib.master+ENDPOINT, bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/x-protobuf")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode != 200 {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("%s", body)
-	}
-
-	go lib.handleEvents(resp.Body)
+	go lib.handleEvents(s)
 	return nil
 
 }

@@ -11,6 +11,12 @@ type Decoder interface {
 	Decode(v interface{}) error
 }
 
+type DecoderFunc func(v interface{}) error
+
+func (df DecoderFunc) Decode(v interface{}) error {
+	return df(v)
+}
+
 type Unmarshaler func([]byte, interface{}) error
 
 type decoder struct {
