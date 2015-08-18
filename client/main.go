@@ -3,27 +3,32 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"crypto/rand"
-	"encoding/hex"
 	"flag"
 	"log"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/jimenez/mesoscon-demo/lib"
 	"github.com/jimenez/mesoscon-demo/lib/mesosproto"
 )
 
-var offers []*mesosproto.Offer
+type client struct {
+	sync.Mutex
+	offers []*mesosproto.Offer
+	lib    *lib.DemoLib
+}
 
-func handleOffers(offer *mesosproto.Offer) {
-	offers = append(offers, offer)
+func (c *client) handleOffers(offer *mesosproto.Offer) {
+	c.Lock()
+	c.offers = append(c.offers, offer)
+	c.Unlock()
 }
 
 func main() {
 	master := flag.String("-master", "localhost:5050", "Mesos Master to connect to")
-	demoLib := lib.New(*master, "mesoscon-demo")
-	if err := demoLib.Subscribe(handleOffers); err != nil {
+	demoClient := client{lib: lib.New(*master, "mesoscon-demo")}
+	if err := demoClient.lib.Subscribe(demoClient.handleOffers); err != nil {
 		log.Fatal(err)
 	}
 
@@ -46,34 +51,28 @@ func main() {
 				log.Println("error: not enough parameters (launch <images> <cmd>)")
 				continue
 			}
-			id := make([]byte, 6)
-			n, err := rand.Read(id)
-			if n != len(id) || err != nil {
-				continue
-			}
 
-			task := lib.Task{
-				ID:      hex.EncodeToString(id),
-				Command: array[2:],
-				Image:   array[1],
-			}
-			if len(offers) == 0 {
+			demoClient.Lock()
+			if len(demoClient.offers) > 0 {
+				offer := demoClient.offers[0]
+
+				demoClient.offers = demoClient.offers[1:]
+
+				if task := lib.NewTask(array[1], array[2:]); task != nil {
+					if err := demoClient.lib.LaunchTask(offer, lib.BuildResources(0.1, 0, 0), task); err != nil {
+						log.Println("error:", err)
+					}
+				}
+			} else {
 				log.Println("error: no offer available to start container")
-				continue
 			}
-			offer := offers[0]
-
-			offers = offers[1:]
-
-			if err := demoLib.LaunchTask(offer, lib.BuildResources(0.1, 0, 0), &task); err != nil {
-				log.Println("error:", err)
-			}
+			demoClient.Unlock()
 		case "kill":
 			if len(array) < 2 {
 				log.Println("error: not enough parameters (kill <taskId>)")
 				continue
 			}
-			if err := demoLib.KillTask(array[1]); err != nil {
+			if err := demoClient.lib.KillTask(array[1]); err != nil {
 				log.Println("error:", err)
 			}
 		default:

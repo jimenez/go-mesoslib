@@ -1,6 +1,8 @@
 package lib
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/gogo/protobuf/proto"
@@ -18,6 +20,20 @@ type Task struct {
 	Command []string
 	Image   string
 	Volumes []*Volume
+}
+
+func NewTask(image string, command []string) *Task {
+	id := make([]byte, 6)
+	n, err := rand.Read(id)
+	if n != len(id) || err != nil {
+		return nil
+	}
+
+	return &Task{
+		ID:      hex.EncodeToString(id),
+		Command: command,
+		Image:   image,
+	}
 }
 
 func createTaskInfo(offer *mesosproto.Offer, resources []*mesosproto.Resource, task *Task) *mesosproto.TaskInfo {
