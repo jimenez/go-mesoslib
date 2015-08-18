@@ -1,10 +1,7 @@
 package lib
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/jimenez/mesoscon-demo/lib/mesosproto"
@@ -74,53 +71,4 @@ func createTaskInfo(offer *mesosproto.Offer, resources []*mesosproto.Resource, t
 	}
 
 	return &taskInfo
-}
-
-func (lib *DemoLib) LaunchTask(offer *mesosproto.Offer, resources []*mesosproto.Resource, task *Task) error {
-	taskInfo := createTaskInfo(offer, resources, task)
-
-	call := mesosproto.Call{
-		FrameworkId: lib.frameworkID,
-		Type:        mesosproto.Call_ACCEPT.Enum(),
-		Accept: &mesosproto.Call_Accept{
-			OfferIds: []*mesosproto.OfferID{
-				offer.Id,
-			},
-			Operations: []*mesosproto.Offer_Operation{
-				&mesosproto.Offer_Operation{
-					Type: mesosproto.Offer_Operation_LAUNCH.Enum(),
-					Launch: &mesosproto.Offer_Operation_Launch{
-						TaskInfos: []*mesosproto.TaskInfo{taskInfo},
-					},
-				},
-			},
-		},
-	}
-
-	body, err := proto.Marshal(&call)
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("POST", "http://"+lib.master+ENDPOINT, bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/x-protobuf")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode != 202 {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("%s", body)
-	}
-
-	return nil
 }
