@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/jimenez/mesoscon-demo/lib/mesosproto"
@@ -34,28 +36,42 @@ func New(master, name string) *DemoLib {
 	}
 }
 
-func (lib *DemoLib) handleEvents(body io.Reader) {
-	dec := json.NewDecoder(body)
-	for {
-		var event mesosproto.Event
+func (lib *DemoLib) handleEvents(body io.ReadCloser) {
+	scanner := bufio.NewReader(body)
 
-		if err := dec.Decode(&event); err != nil {
-			fmt.Printf("%#v\n", event)
-			if err == io.EOF {
-				break
+	data, _, err := scanner.ReadLine()
+	if err == io.EOF {
+		return
+	}
+
+	sdata := bytes.NewBuffer(data).String()
+	if sdata == "" {
+		return
+	}
+	size, _ := strconv.Atoi(sdata)
+
+	for {
+		var data []byte
+
+		for len(data) < size {
+			line, _, _ := scanner.ReadLine()
+			data = append(data, line...)
+		}
+
+		message := data[0:size]
+		size, _ = strconv.Atoi(bytes.NewBuffer(data[size:]).String())
+
+		var event mesosproto.Event
+		if err := json.Unmarshal(message, &event); err != nil {
+
+		}
+		if event.GetType() == mesosproto.Event_UPDATE {
+			taskStatus := event.GetUpdate().GetStatus()
+			lib.tasks[taskStatus.GetTaskId().GetValue()] = taskStatus.GetAgentId()
+			log.Println("Status for", taskStatus.GetTaskId().GetValue(), "on", taskStatus.GetAgentId().GetValue(), "is", taskStatus.GetState().String())
+			if taskStatus.GetUuid() != nil {
+				lib.Acknowledge(taskStatus.GetTaskId(), taskStatus.GetAgentId(), taskStatus.GetUuid())
 			}
-			if event.GetType() == mesosproto.Event_UPDATE {
-				//				fmt.Printf("%#v\n", event)
-				taskStatus := event.GetUpdate().GetStatus()
-				fmt.Printf("%#v\n", taskStatus)
-				lib.tasks[taskStatus.GetTaskId().GetValue()] = taskStatus.GetAgentId()
-				log.Println("Status for", taskStatus.GetTaskId().GetValue(), "on", taskStatus.GetAgentId().GetValue(), "is", taskStatus.GetState().String())
-				if taskStatus.GetUuid() != nil {
-					log.Println("Acknowledge", taskStatus.GetTaskId().GetValue())
-					lib.Acknowledge(taskStatus.GetTaskId(), taskStatus.GetAgentId(), taskStatus.GetUuid())
-				}
-			}
-			continue
 		}
 
 		switch event.GetType() {
