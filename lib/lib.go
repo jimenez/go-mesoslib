@@ -20,6 +20,7 @@ type DemoLib struct {
 	master        string
 	frameworkInfo *mesosproto.FrameworkInfo
 	frameworkID   *mesosproto.FrameworkID
+	tasks         map[string]*mesosproto.AgentID
 	OffersCH      chan *mesosproto.Offer
 }
 
@@ -28,6 +29,7 @@ func New(master, name string) *DemoLib {
 		name:          name,
 		master:        master,
 		frameworkInfo: &mesosproto.FrameworkInfo{Name: &name, User: proto.String("root")},
+		tasks:         make(map[string]*mesosproto.AgentID),
 		OffersCH:      make(chan *mesosproto.Offer),
 	}
 }
@@ -38,12 +40,20 @@ func (lib *DemoLib) handleEvents(body io.Reader) {
 		var event mesosproto.Event
 
 		if err := dec.Decode(&event); err != nil {
+			fmt.Printf("%#v\n", event)
 			if err == io.EOF {
 				break
 			}
 			if event.GetType() == mesosproto.Event_UPDATE {
+				//				fmt.Printf("%#v\n", event)
 				taskStatus := event.GetUpdate().GetStatus()
-				log.Println("Status for", taskStatus.GetTaskId().GetValue(), "is", taskStatus.GetState().String())
+				fmt.Printf("%#v\n", taskStatus)
+				lib.tasks[taskStatus.GetTaskId().GetValue()] = taskStatus.GetAgentId()
+				log.Println("Status for", taskStatus.GetTaskId().GetValue(), "on", taskStatus.GetAgentId().GetValue(), "is", taskStatus.GetState().String())
+				if taskStatus.GetUuid() != nil {
+					log.Println("Acknowledge", taskStatus.GetTaskId().GetValue())
+					lib.Acknowledge(taskStatus.GetTaskId(), taskStatus.GetAgentId(), taskStatus.GetUuid())
+				}
 			}
 			continue
 		}

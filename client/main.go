@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -42,18 +43,38 @@ func main() {
 			continue
 		}
 
-		lline := bytes.NewBuffer(line).String()
-		task := lib.Task{
-			ID:      hex.EncodeToString(id),
-			Command: strings.Split(strings.TrimSpace(lline), " "),
-			Image:   "busybox",
+		array := strings.Split(strings.ToLower(strings.TrimSpace(bytes.NewBuffer(line).String())), " ")
+
+		if len(array) < 1 {
+			continue
 		}
-		offer := offers[0]
 
-		offers = nil
+		switch array[0] {
+		case "launch":
+			if len(array) < 3 {
+				fmt.Println("error: not enough parameters (launch <images> <cmd>)")
+			}
+			task := lib.Task{
+				ID:      hex.EncodeToString(id),
+				Command: array[2:],
+				Image:   array[1],
+			}
+			offer := offers[0]
 
-		if err := demoLib.LaunchTask(offer, lib.BuildResources(0.1, 0, 0), &task); err != nil {
-			log.Println(err)
+			offers = nil
+
+			if err := demoLib.LaunchTask(offer, lib.BuildResources(0.1, 0, 0), &task); err != nil {
+				log.Println(err)
+			}
+		case "kill":
+			if len(array) < 2 {
+				fmt.Println("error: not enough parameters (kill <taskId>)")
+			}
+			if err := demoLib.KillTask(array[1]); err != nil {
+				log.Println(err)
+			}
+		default:
+			log.Println("error: invalid command (launch, kill)")
 		}
 	}
 }
