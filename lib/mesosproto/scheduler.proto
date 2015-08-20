@@ -20,7 +20,7 @@ import "mesos.proto";
 
 package mesosproto;
 
-option java_package = "org.apache.mesosproto.scheduler";
+option java_package = "org.apache.mesos.v1.scheduler";
 option java_outer_classname = "Protos";
 
 
@@ -51,6 +51,7 @@ message Event {
     // close the existing subscription connection and resubscribe
     // using a backoff strategy.
     HEARTBEAT = 8;
+    CRIU = 9;      // See 'CRIU' below.
   }
 
   // First event received when the scheduler subscribes.
@@ -135,6 +136,16 @@ message Event {
     required string message = 1;
   }
 
+  message Criu {
+    enum Type {
+      CHECKPOINTED = 1;
+      RESTORED = 2;
+    }
+    required Type type = 1;
+    required TaskID current_task_id = 2;
+    optional TaskID old_task_id = 3;
+  }
+
   // Type of the event, indicates which optional field below should be
   // present if that type has a nested message definition.
   required Type type = 1;
@@ -146,6 +157,7 @@ message Event {
   optional Message message = 6;
   optional Failure failure = 7;
   optional Error error = 8;
+  optional Criu criu = 9;
 }
 
 
@@ -170,7 +182,7 @@ message Call {
     RECONCILE = 9;   // See 'Reconcile' below.
     MESSAGE = 10;    // See 'Message' below.
     REQUEST = 11;    // See 'Request' below.
-
+    CRIU = 12;
     // TODO(benh): Consider adding an 'ACTIVATE' and 'DEACTIVATE' for
     // already subscribed frameworks as a way of stopping offers from
     // being generated and other events from being sent by the master.
@@ -300,6 +312,18 @@ message Call {
     required bytes data = 3;
   }
 
+
+  message Criu {
+    enum Type {
+      CHECKPOINT = 1;
+      RESTORE = 2;
+    }
+    required Type type = 1;
+    required AgentID agent_id = 2;
+    required TaskID task_id = 3;
+    required string container_id = 4;
+  }
+
   // Requests a specific set of resources from Mesos's allocator. If
   // the allocator has support for this, corresponding offers will be
   // sent asynchronously via the OFFERS event(s).
@@ -307,7 +331,7 @@ message Call {
   // NOTE: The built-in hierarchical allocator doesn't have support
   // for this call and hence simply ignores it.
   message Request {
-    repeated mesosproto.Request requests = 1;
+    repeated Request requests = 1;
   }
 
   // Identifies who generated this call. Master assigns a framework id
@@ -331,4 +355,5 @@ message Call {
   optional Reconcile reconcile = 9;
   optional Message message = 10;
   optional Request request = 11;
+  optional Criu criu = 12;
 }

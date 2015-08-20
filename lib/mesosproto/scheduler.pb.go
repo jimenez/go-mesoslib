@@ -31,6 +31,7 @@ const (
 	// close the existing subscription connection and resubscribe
 	// using a backoff strategy.
 	Event_HEARTBEAT Event_Type = 8
+	Event_CRIU      Event_Type = 9
 )
 
 var Event_Type_name = map[int32]string{
@@ -42,6 +43,7 @@ var Event_Type_name = map[int32]string{
 	6: "FAILURE",
 	7: "ERROR",
 	8: "HEARTBEAT",
+	9: "CRIU",
 }
 var Event_Type_value = map[string]int32{
 	"SUBSCRIBED": 1,
@@ -52,6 +54,7 @@ var Event_Type_value = map[string]int32{
 	"FAILURE":    6,
 	"ERROR":      7,
 	"HEARTBEAT":  8,
+	"CRIU":       9,
 }
 
 func (x Event_Type) Enum() *Event_Type {
@@ -71,6 +74,39 @@ func (x *Event_Type) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type Event_Criu_Type int32
+
+const (
+	Event_Criu_CHECKPOINTED Event_Criu_Type = 1
+	Event_Criu_RESTORED     Event_Criu_Type = 2
+)
+
+var Event_Criu_Type_name = map[int32]string{
+	1: "CHECKPOINTED",
+	2: "RESTORED",
+}
+var Event_Criu_Type_value = map[string]int32{
+	"CHECKPOINTED": 1,
+	"RESTORED":     2,
+}
+
+func (x Event_Criu_Type) Enum() *Event_Criu_Type {
+	p := new(Event_Criu_Type)
+	*p = x
+	return p
+}
+func (x Event_Criu_Type) String() string {
+	return proto.EnumName(Event_Criu_Type_name, int32(x))
+}
+func (x *Event_Criu_Type) UnmarshalJSON(data []byte) error {
+	value, err := proto.UnmarshalJSONEnum(Event_Criu_Type_value, data, "Event_Criu_Type")
+	if err != nil {
+		return err
+	}
+	*x = Event_Criu_Type(value)
+	return nil
+}
+
 // Possible call types, followed by message definitions if
 // applicable.
 type Call_Type int32
@@ -87,6 +123,7 @@ const (
 	Call_RECONCILE   Call_Type = 9
 	Call_MESSAGE     Call_Type = 10
 	Call_REQUEST     Call_Type = 11
+	Call_CRIU        Call_Type = 12
 )
 
 var Call_Type_name = map[int32]string{
@@ -101,6 +138,7 @@ var Call_Type_name = map[int32]string{
 	9:  "RECONCILE",
 	10: "MESSAGE",
 	11: "REQUEST",
+	12: "CRIU",
 }
 var Call_Type_value = map[string]int32{
 	"SUBSCRIBE":   1,
@@ -114,6 +152,7 @@ var Call_Type_value = map[string]int32{
 	"RECONCILE":   9,
 	"MESSAGE":     10,
 	"REQUEST":     11,
+	"CRIU":        12,
 }
 
 func (x Call_Type) Enum() *Call_Type {
@@ -130,6 +169,39 @@ func (x *Call_Type) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*x = Call_Type(value)
+	return nil
+}
+
+type Call_Criu_Type int32
+
+const (
+	Call_Criu_CHECKPOINT Call_Criu_Type = 1
+	Call_Criu_RESTORE    Call_Criu_Type = 2
+)
+
+var Call_Criu_Type_name = map[int32]string{
+	1: "CHECKPOINT",
+	2: "RESTORE",
+}
+var Call_Criu_Type_value = map[string]int32{
+	"CHECKPOINT": 1,
+	"RESTORE":    2,
+}
+
+func (x Call_Criu_Type) Enum() *Call_Criu_Type {
+	p := new(Call_Criu_Type)
+	*p = x
+	return p
+}
+func (x Call_Criu_Type) String() string {
+	return proto.EnumName(Call_Criu_Type_name, int32(x))
+}
+func (x *Call_Criu_Type) UnmarshalJSON(data []byte) error {
+	value, err := proto.UnmarshalJSONEnum(Call_Criu_Type_value, data, "Call_Criu_Type")
+	if err != nil {
+		return err
+	}
+	*x = Call_Criu_Type(value)
 	return nil
 }
 
@@ -150,6 +222,7 @@ type Event struct {
 	Message          *Event_Message    `protobuf:"bytes,6,opt,name=message" json:"message,omitempty"`
 	Failure          *Event_Failure    `protobuf:"bytes,7,opt,name=failure" json:"failure,omitempty"`
 	Error            *Event_Error      `protobuf:"bytes,8,opt,name=error" json:"error,omitempty"`
+	Criu             *Event_Criu       `protobuf:"bytes,9,opt,name=criu" json:"criu,omitempty"`
 	XXX_unrecognized []byte            `json:"-"`
 }
 
@@ -209,6 +282,13 @@ func (m *Event) GetFailure() *Event_Failure {
 func (m *Event) GetError() *Event_Error {
 	if m != nil {
 		return m.Error
+	}
+	return nil
+}
+
+func (m *Event) GetCriu() *Event_Criu {
+	if m != nil {
+		return m.Criu
 	}
 	return nil
 }
@@ -412,6 +492,38 @@ func (m *Event_Error) GetMessage() string {
 	return ""
 }
 
+type Event_Criu struct {
+	Type             *Event_Criu_Type `protobuf:"varint,1,req,name=type,enum=mesosproto.Event_Criu_Type" json:"type,omitempty"`
+	CurrentTaskId    *TaskID          `protobuf:"bytes,2,req,name=current_task_id" json:"current_task_id,omitempty"`
+	OldTaskId        *TaskID          `protobuf:"bytes,3,opt,name=old_task_id" json:"old_task_id,omitempty"`
+	XXX_unrecognized []byte           `json:"-"`
+}
+
+func (m *Event_Criu) Reset()         { *m = Event_Criu{} }
+func (m *Event_Criu) String() string { return proto.CompactTextString(m) }
+func (*Event_Criu) ProtoMessage()    {}
+
+func (m *Event_Criu) GetType() Event_Criu_Type {
+	if m != nil && m.Type != nil {
+		return *m.Type
+	}
+	return Event_Criu_CHECKPOINTED
+}
+
+func (m *Event_Criu) GetCurrentTaskId() *TaskID {
+	if m != nil {
+		return m.CurrentTaskId
+	}
+	return nil
+}
+
+func (m *Event_Criu) GetOldTaskId() *TaskID {
+	if m != nil {
+		return m.OldTaskId
+	}
+	return nil
+}
+
 // *
 // Scheduler call API.
 //
@@ -437,6 +549,7 @@ type Call struct {
 	Reconcile        *Call_Reconcile   `protobuf:"bytes,9,opt,name=reconcile" json:"reconcile,omitempty"`
 	Message          *Call_Message     `protobuf:"bytes,10,opt,name=message" json:"message,omitempty"`
 	Request          *Call_Request     `protobuf:"bytes,11,opt,name=request" json:"request,omitempty"`
+	Criu             *Call_Criu        `protobuf:"bytes,12,opt,name=criu" json:"criu,omitempty"`
 	XXX_unrecognized []byte            `json:"-"`
 }
 
@@ -517,6 +630,13 @@ func (m *Call) GetMessage() *Call_Message {
 func (m *Call) GetRequest() *Call_Request {
 	if m != nil {
 		return m.Request
+	}
+	return nil
+}
+
+func (m *Call) GetCriu() *Call_Criu {
+	if m != nil {
+		return m.Criu
 	}
 	return nil
 }
@@ -825,6 +945,46 @@ func (m *Call_Message) GetData() []byte {
 	return nil
 }
 
+type Call_Criu struct {
+	Type             *Call_Criu_Type `protobuf:"varint,1,req,name=type,enum=mesosproto.Call_Criu_Type" json:"type,omitempty"`
+	AgentId          *AgentID        `protobuf:"bytes,2,req,name=agent_id" json:"agent_id,omitempty"`
+	TaskId           *TaskID         `protobuf:"bytes,3,req,name=task_id" json:"task_id,omitempty"`
+	ContainerId      *string         `protobuf:"bytes,4,req,name=container_id" json:"container_id,omitempty"`
+	XXX_unrecognized []byte          `json:"-"`
+}
+
+func (m *Call_Criu) Reset()         { *m = Call_Criu{} }
+func (m *Call_Criu) String() string { return proto.CompactTextString(m) }
+func (*Call_Criu) ProtoMessage()    {}
+
+func (m *Call_Criu) GetType() Call_Criu_Type {
+	if m != nil && m.Type != nil {
+		return *m.Type
+	}
+	return Call_Criu_CHECKPOINT
+}
+
+func (m *Call_Criu) GetAgentId() *AgentID {
+	if m != nil {
+		return m.AgentId
+	}
+	return nil
+}
+
+func (m *Call_Criu) GetTaskId() *TaskID {
+	if m != nil {
+		return m.TaskId
+	}
+	return nil
+}
+
+func (m *Call_Criu) GetContainerId() string {
+	if m != nil && m.ContainerId != nil {
+		return *m.ContainerId
+	}
+	return ""
+}
+
 // Requests a specific set of resources from Mesos's allocator. If
 // the allocator has support for this, corresponding offers will be
 // sent asynchronously via the OFFERS event(s).
@@ -832,15 +992,15 @@ func (m *Call_Message) GetData() []byte {
 // NOTE: The built-in hierarchical allocator doesn't have support
 // for this call and hence simply ignores it.
 type Call_Request struct {
-	Requests         []*Request `protobuf:"bytes,1,rep,name=requests" json:"requests,omitempty"`
-	XXX_unrecognized []byte     `json:"-"`
+	Requests         []*Call_Request `protobuf:"bytes,1,rep,name=requests" json:"requests,omitempty"`
+	XXX_unrecognized []byte          `json:"-"`
 }
 
 func (m *Call_Request) Reset()         { *m = Call_Request{} }
 func (m *Call_Request) String() string { return proto.CompactTextString(m) }
 func (*Call_Request) ProtoMessage()    {}
 
-func (m *Call_Request) GetRequests() []*Request {
+func (m *Call_Request) GetRequests() []*Call_Request {
 	if m != nil {
 		return m.Requests
 	}
@@ -849,5 +1009,7 @@ func (m *Call_Request) GetRequests() []*Request {
 
 func init() {
 	proto.RegisterEnum("mesosproto.Event_Type", Event_Type_name, Event_Type_value)
+	proto.RegisterEnum("mesosproto.Event_Criu_Type", Event_Criu_Type_name, Event_Criu_Type_value)
 	proto.RegisterEnum("mesosproto.Call_Type", Call_Type_name, Call_Type_value)
+	proto.RegisterEnum("mesosproto.Call_Criu_Type", Call_Criu_Type_name, Call_Criu_Type_value)
 }

@@ -51,9 +51,8 @@ func main() {
 				log.Println("error: not enough parameters (launch <images> <cmd>)")
 				continue
 			}
-
 			demoClient.Lock()
-			if len(demoClient.offers) < 0 {
+			if len(demoClient.offers) > 0 {
 				offer := demoClient.offers[0]
 
 				demoClient.offers = demoClient.offers[1:]
@@ -73,6 +72,22 @@ func main() {
 				continue
 			}
 			if err := demoClient.lib.KillTask(array[1]); err != nil {
+				log.Println("error:", err)
+			}
+		case "checkpoint":
+			if len(array) < 2 {
+				log.Println("error: not enough parameters (Checkpoint <taskId>)")
+				continue
+			}
+			if err := demoClient.lib.Checkpoint(array[1]); err != nil {
+				log.Println("error:", err)
+			}
+		case "restore":
+			if len(array) < 2 {
+				log.Println("error: not enough parameters (Restore <taskId>)")
+				continue
+			}
+			if err := demoClient.lib.Checkpoint(array[1]); err != nil {
 				log.Println("error:", err)
 			}
 		default:

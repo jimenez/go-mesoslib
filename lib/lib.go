@@ -13,6 +13,7 @@ type DemoLib struct {
 	frameworkInfo *mesosproto.FrameworkInfo
 	frameworkID   *mesosproto.FrameworkID
 	tasks         map[string]*mesosproto.AgentID
+	containers    map[string]string
 }
 
 func New(master, name string) *DemoLib {
@@ -21,6 +22,7 @@ func New(master, name string) *DemoLib {
 		master:        master,
 		frameworkInfo: &mesosproto.FrameworkInfo{Name: &name, User: proto.String("root")},
 		tasks:         make(map[string]*mesosproto.AgentID),
+		containers:    make(map[string]string),
 	}
 }
 

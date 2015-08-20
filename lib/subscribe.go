@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/jimenez/mesoscon-demo/lib/mesosproto"
+	"github.com/samalba/dockerclient"
 )
 
 func (lib *DemoLib) handleEvents(body io.ReadCloser, handler OfferHandler) {
@@ -18,9 +19,17 @@ func (lib *DemoLib) handleEvents(body io.ReadCloser, handler OfferHandler) {
 		if event.GetType() == mesosproto.Event_UPDATE {
 			taskStatus := event.GetUpdate().GetStatus()
 			lib.tasks[taskStatus.GetTaskId().GetValue()] = taskStatus.GetAgentId()
+			inspect := []dockerclient.ContainerInfo{}
+			data := taskStatus.Data
+			if data != nil && json.Unmarshal(data, &inspect) == nil && len(inspect) == 1 {
+
+				lib.containers[taskStatus.GetTaskId().GetValue()] = inspect[0].Id
+			}
+
 			log.Println("Status for", taskStatus.GetTaskId().GetValue(), "on", taskStatus.GetAgentId().GetValue(), "is", taskStatus.GetState().String())
 			if taskStatus.GetUuid() != nil {
 				lib.Acknowledge(taskStatus.GetTaskId(), taskStatus.GetAgentId(), taskStatus.GetUuid())
+
 			}
 		}
 
