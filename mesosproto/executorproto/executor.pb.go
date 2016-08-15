@@ -17,7 +17,7 @@ package executorproto
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import mesos_v1 "github.com/jimenez/mesoscon-demo/mesoslib/mesosproto"
+import mesos_v1 "github.com/jimenez/go-mesoslib/mesosproto"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jimenez/mesoscon-demo/mesoslib"
-	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto"
-	"github.com/jimenez/mesoscon-demo/mesoslib/scheduler"
+	"github.com/jimenez/go-mesoslib"
+	"github.com/jimenez/go-mesoslib/mesosproto"
+	"github.com/jimenez/go-mesoslib/scheduler"
 )
 
 type client struct {

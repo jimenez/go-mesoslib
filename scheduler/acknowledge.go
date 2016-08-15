@@ -1,8 +1,8 @@
 package scheduler
 
 import (
-	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto"
-	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto/schedulerproto"
+	"github.com/jimenez/go-mesoslib/mesosproto"
+	"github.com/jimenez/go-mesoslib/mesosproto/schedulerproto"
 )
 
 func (lib *SchedulerLib) Acknowledge(taskId *mesosproto.TaskID, AgentId *mesosproto.AgentID, UUID []byte) error {

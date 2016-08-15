@@ -1,9 +1,9 @@
 package scheduler
 
 import (
-	"github.com/jimenez/mesoscon-demo/mesoslib"
-	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto"
-	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto/schedulerproto"
+	mesoslib "github.com/jimenez/go-mesoslib"
+	"github.com/jimenez/go-mesoslib/mesosproto"
+	"github.com/jimenez/go-mesoslib/mesosproto/schedulerproto"
 )
 
 func (lib *SchedulerLib) LaunchTask(offer *mesosproto.Offer, resources []*mesosproto.Resource, task *mesoslib.Task) error {

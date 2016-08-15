@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto/schedulerproto"
+	"github.com/jimenez/go-mesoslib/mesosproto/schedulerproto"
 )
 
 func (lib *SchedulerLib) send(call *schedulerproto.Call, statusExpected int) (io.ReadCloser, error) {

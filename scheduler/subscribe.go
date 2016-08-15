@@ -5,7 +5,7 @@ import (
 	"io"
 	"log"
 
-	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto/schedulerproto"
+	"github.com/jimenez/go-mesoslib/mesosproto/schedulerproto"
 )
 
 func (lib *SchedulerLib) handleEvents(body io.ReadCloser, handler OfferHandler) {

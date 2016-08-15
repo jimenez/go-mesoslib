@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"github.com/gogo/protobuf/proto"
-	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto"
+	"github.com/jimenez/go-mesoslib/mesosproto"
 )
 
 const ENDPOINT = "/master/api/v1/scheduler"

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto"
+	"github.com/jimenez/go-mesoslib/mesosproto"
 )
 
 type Volume struct {
