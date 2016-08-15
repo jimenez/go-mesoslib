@@ -1,14 +1,14 @@
-package lib
+package scheduler
 
 import (
 	"encoding/json"
 	"io"
 	"log"
 
-	"github.com/jimenez/mesoscon-demo/lib/mesosproto/schedulerproto"
+	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto/schedulerproto"
 )
 
-func (lib *DemoLib) handleEvents(body io.ReadCloser, handler OfferHandler) {
+func (lib *SchedulerLib) handleEvents(body io.ReadCloser, handler OfferHandler) {
 	dec := json.NewDecoder(body)
 	for {
 		var event schedulerproto.Event
@@ -37,7 +37,7 @@ func (lib *DemoLib) handleEvents(body io.ReadCloser, handler OfferHandler) {
 	}
 }
 
-func (lib *DemoLib) Subscribe(handler OfferHandler) error {
+func (lib *SchedulerLib) Subscribe(handler OfferHandler) error {
 	call := &schedulerproto.Call{
 		Type: schedulerproto.Call_SUBSCRIBE.Enum(),
 		Subscribe: &schedulerproto.Call_Subscribe{

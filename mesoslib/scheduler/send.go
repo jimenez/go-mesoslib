@@ -1,4 +1,4 @@
-package lib
+package scheduler
 
 import (
 	"bytes"
@@ -8,10 +8,10 @@ import (
 	"net/http"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/jimenez/mesoscon-demo/lib/mesosproto/schedulerproto"
+	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto/schedulerproto"
 )
 
-func (lib *DemoLib) send(call *schedulerproto.Call, statusExpected int) (io.ReadCloser, error) {
+func (lib *SchedulerLib) send(call *schedulerproto.Call, statusExpected int) (io.ReadCloser, error) {
 	body, err := proto.Marshal(call)
 	if err != nil {
 		return nil, err

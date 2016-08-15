@@ -1,8 +1,6 @@
-package lib
+package mesoslib
 
-import (
-	"github.com/jimenez/mesoscon-demo/lib/mesosproto"
-)
+import "github.com/jimenez/mesoscon-demo/mesoslib/mesosproto"
 
 func createScalarResource(name string, value float64) *mesosproto.Resource {
 	return &mesosproto.Resource{

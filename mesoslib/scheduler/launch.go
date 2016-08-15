@@ -1,12 +1,13 @@
-package lib
+package scheduler
 
 import (
-	"github.com/jimenez/mesoscon-demo/lib/mesosproto"
-	"github.com/jimenez/mesoscon-demo/lib/mesosproto/schedulerproto"
+	"github.com/jimenez/mesoscon-demo/mesoslib"
+	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto"
+	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto/schedulerproto"
 )
 
-func (lib *DemoLib) LaunchTask(offer *mesosproto.Offer, resources []*mesosproto.Resource, task *Task) error {
-	taskInfo := createTaskInfo(offer, resources, task)
+func (lib *SchedulerLib) LaunchTask(offer *mesosproto.Offer, resources []*mesosproto.Resource, task *mesoslib.Task) error {
+	taskInfo := mesoslib.CreateTaskInfo(offer, resources, task)
 
 	call := &schedulerproto.Call{
 		FrameworkId: lib.frameworkID,

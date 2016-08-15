@@ -1,4 +1,4 @@
-package lib
+package mesoslib
 
 import (
 	"crypto/rand"
@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/jimenez/mesoscon-demo/lib/mesosproto"
+	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto"
 )
 
 type Volume struct {
@@ -36,7 +36,8 @@ func NewTask(image string, command []string) *Task {
 	}
 }
 
-func createTaskInfo(offer *mesosproto.Offer, resources []*mesosproto.Resource, task *Task) *mesosproto.TaskInfo {
+// Helper for task info object creation
+func CreateTaskInfo(offer *mesosproto.Offer, resources []*mesosproto.Resource, task *Task) *mesosproto.TaskInfo {
 	taskInfo := mesosproto.TaskInfo{
 		Name: proto.String(fmt.Sprintf("mesoscon-demo-task-%s", task.ID)),
 		TaskId: &mesosproto.TaskID{
