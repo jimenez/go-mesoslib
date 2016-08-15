@@ -1,11 +1,11 @@
-package lib
+package scheduler
 
 import (
-	"github.com/jimenez/mesoscon-demo/lib/mesosproto"
-	"github.com/jimenez/mesoscon-demo/lib/mesosproto/schedulerproto"
+	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto"
+	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto/schedulerproto"
 )
 
-func (lib *DemoLib) KillTask(taskId string) error {
+func (lib *SchedulerLib) KillTask(taskId string) error {
 	call := &schedulerproto.Call{
 		FrameworkId: lib.frameworkID,
 		Type:        schedulerproto.Call_KILL.Enum(),

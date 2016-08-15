@@ -1,13 +1,13 @@
-package lib
+package scheduler
 
 import (
 	"github.com/gogo/protobuf/proto"
-	"github.com/jimenez/mesoscon-demo/lib/mesosproto"
+	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto"
 )
 
 const ENDPOINT = "/master/api/v1/scheduler"
 
-type DemoLib struct {
+type SchedulerLib struct {
 	name          string
 	master        string
 	frameworkInfo *mesosproto.FrameworkInfo
@@ -15,8 +15,8 @@ type DemoLib struct {
 	tasks         map[string]*mesosproto.AgentID
 }
 
-func New(master, name string) *DemoLib {
-	return &DemoLib{
+func New(master, name string) *SchedulerLib {
+	return &SchedulerLib{
 		name:          name,
 		master:        master,
 		frameworkInfo: &mesosproto.FrameworkInfo{Name: &name, User: proto.String("root")},

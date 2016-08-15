@@ -9,14 +9,15 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jimenez/mesoscon-demo/lib"
-	"github.com/jimenez/mesoscon-demo/lib/mesosproto"
+	"github.com/jimenez/mesoscon-demo/mesoslib"
+	"github.com/jimenez/mesoscon-demo/mesoslib/mesosproto"
+	"github.com/jimenez/mesoscon-demo/mesoslib/scheduler"
 )
 
 type client struct {
 	sync.Mutex
 	offers []*mesosproto.Offer
-	lib    *lib.DemoLib
+	lib    *scheduler.SchedulerLib
 }
 
 func (c *client) handleOffers(offer *mesosproto.Offer) {
@@ -27,7 +28,7 @@ func (c *client) handleOffers(offer *mesosproto.Offer) {
 
 func main() {
 	master := flag.String("-master", "localhost:5050", "Mesos Master to connect to")
-	demoClient := client{lib: lib.New(*master, "mesoscon-demo")}
+	demoClient := client{lib: scheduler.New(*master, "mesoscon-demo")}
 	if err := demoClient.lib.Subscribe(demoClient.handleOffers); err != nil {
 		log.Fatal(err)
 	}
@@ -58,8 +59,8 @@ func main() {
 
 				demoClient.offers = demoClient.offers[1:]
 
-				if task := lib.NewTask(array[1], array[2:]); task != nil {
-					if err := demoClient.lib.LaunchTask(offer, lib.BuildResources(0.1, 0, 0), task); err != nil {
+				if task := mesoslib.NewTask(array[1], array[2:]); task != nil {
+					if err := demoClient.lib.LaunchTask(offer, mesoslib.BuildResources(0.1, 0, 0), task); err != nil {
 						log.Println("error:", err)
 					}
 				}
