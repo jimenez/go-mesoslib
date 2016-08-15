@@ -1,12 +1,15 @@
 package lib
 
-import "github.com/jimenez/mesoscon-demo/lib/mesosproto"
+import (
+	"github.com/jimenez/mesoscon-demo/lib/mesosproto"
+	"github.com/jimenez/mesoscon-demo/lib/mesosproto/schedulerproto"
+)
 
 func (lib *DemoLib) Acknowledge(taskId *mesosproto.TaskID, AgentId *mesosproto.AgentID, UUID []byte) error {
-	call := &mesosproto.Call{
+	call := &schedulerproto.Call{
 		FrameworkId: lib.frameworkID,
-		Type:        mesosproto.Call_ACKNOWLEDGE.Enum(),
-		Acknowledge: &mesosproto.Call_Acknowledge{
+		Type:        schedulerproto.Call_ACKNOWLEDGE.Enum(),
+		Acknowledge: &schedulerproto.Call_Acknowledge{
 			AgentId: AgentId,
 			TaskId:  taskId,
 			Uuid:    UUID,

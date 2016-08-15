@@ -7,7 +7,6 @@ Package mesosproto is a generated protocol buffer package.
 
 It is generated from these files:
 	mesos.proto
-	scheduler.proto
 
 It has these top-level messages:
 	FrameworkID
@@ -16,10 +15,16 @@ It has these top-level messages:
 	TaskID
 	ExecutorID
 	ContainerID
+	TimeInfo
+	DurationInfo
 	Address
 	URL
+	Unavailability
+	MachineID
+	MachineInfo
 	FrameworkInfo
 	HealthCheck
+	KillPolicy
 	CommandInfo
 	ExecutorInfo
 	MasterInfo
@@ -28,12 +33,19 @@ It has these top-level messages:
 	Attribute
 	Resource
 	TrafficControlStatistics
+	IpStatistics
+	IcmpStatistics
+	TcpStatistics
+	UdpStatistics
+	SNMPStatistics
 	ResourceStatistics
 	ResourceUsage
 	PerfStatistics
 	Request
 	Offer
+	InverseOffer
 	TaskInfo
+	Task
 	TaskStatus
 	Filters
 	Environment
@@ -41,27 +53,42 @@ It has these top-level messages:
 	Parameters
 	Credential
 	Credentials
-	ACL
-	ACLs
 	RateLimit
 	RateLimits
 	Image
 	Volume
+	NetworkInfo
 	ContainerInfo
+	ContainerStatus
+	CgroupInfo
 	Labels
 	Label
 	Port
 	Ports
 	DiscoveryInfo
+	WeightInfo
+	VersionInfo
+	Flag
+	Role
+	Metric
+	FileInfo
 */
 package mesosproto
 
 import proto "github.com/golang/protobuf/proto"
+import fmt "fmt"
 import math "math"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
+var _ = fmt.Errorf
 var _ = math.Inf
+
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
 // *
 // Status is used to indicate the state of the scheduler and executor
@@ -104,6 +131,7 @@ func (x *Status) UnmarshalJSON(data []byte) error {
 	*x = Status(value)
 	return nil
 }
+func (Status) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
 // *
 // Describes possible task states. IMPORTANT: Mesos assumes tasks that
@@ -117,6 +145,9 @@ const (
 	TaskState_TASK_STAGING  TaskState = 6
 	TaskState_TASK_STARTING TaskState = 0
 	TaskState_TASK_RUNNING  TaskState = 1
+	// NOTE: This should only be sent when the framework has
+	// the TASK_KILLING_STATE capability.
+	TaskState_TASK_KILLING  TaskState = 8
 	TaskState_TASK_FINISHED TaskState = 2
 	TaskState_TASK_FAILED   TaskState = 3
 	TaskState_TASK_KILLED   TaskState = 4
@@ -128,6 +159,7 @@ var TaskState_name = map[int32]string{
 	6: "TASK_STAGING",
 	0: "TASK_STARTING",
 	1: "TASK_RUNNING",
+	8: "TASK_KILLING",
 	2: "TASK_FINISHED",
 	3: "TASK_FAILED",
 	4: "TASK_KILLED",
@@ -138,6 +170,7 @@ var TaskState_value = map[string]int32{
 	"TASK_STAGING":  6,
 	"TASK_STARTING": 0,
 	"TASK_RUNNING":  1,
+	"TASK_KILLING":  8,
 	"TASK_FINISHED": 2,
 	"TASK_FAILED":   3,
 	"TASK_KILLED":   4,
@@ -161,21 +194,99 @@ func (x *TaskState) UnmarshalJSON(data []byte) error {
 	*x = TaskState(value)
 	return nil
 }
+func (TaskState) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+
+// Describes the several states that a machine can be in.  A `Mode`
+// applies to a machine and to all associated agents on the machine.
+type MachineInfo_Mode int32
+
+const (
+	// In this mode, a machine is behaving normally;
+	// offering resources, executing tasks, etc.
+	MachineInfo_UP MachineInfo_Mode = 1
+	// In this mode, all agents on the machine are expected to cooperate with
+	// frameworks to drain resources.  In general, draining is done ahead of
+	// a pending `unavailability`.  The resources should be drained so as to
+	// maximize utilization prior to the maintenance but without knowingly
+	// violating the frameworks' requirements.
+	MachineInfo_DRAINING MachineInfo_Mode = 2
+	// In this mode, a machine is not running any tasks and will not offer
+	// any of its resources.  Agents on the machine will not be allowed to
+	// register with the master.
+	MachineInfo_DOWN MachineInfo_Mode = 3
+)
+
+var MachineInfo_Mode_name = map[int32]string{
+	1: "UP",
+	2: "DRAINING",
+	3: "DOWN",
+}
+var MachineInfo_Mode_value = map[string]int32{
+	"UP":       1,
+	"DRAINING": 2,
+	"DOWN":     3,
+}
+
+func (x MachineInfo_Mode) Enum() *MachineInfo_Mode {
+	p := new(MachineInfo_Mode)
+	*p = x
+	return p
+}
+func (x MachineInfo_Mode) String() string {
+	return proto.EnumName(MachineInfo_Mode_name, int32(x))
+}
+func (x *MachineInfo_Mode) UnmarshalJSON(data []byte) error {
+	value, err := proto.UnmarshalJSONEnum(MachineInfo_Mode_value, data, "MachineInfo_Mode")
+	if err != nil {
+		return err
+	}
+	*x = MachineInfo_Mode(value)
+	return nil
+}
+func (MachineInfo_Mode) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{12, 0} }
 
 type FrameworkInfo_Capability_Type int32
 
 const (
+	// This must be the first enum value in this list, to
+	// ensure that if 'type' is not set, the default value
+	// is UNKNOWN. This enables enum values to be added
+	// in a backwards-compatible way. See: MESOS-4997.
+	FrameworkInfo_Capability_UNKNOWN FrameworkInfo_Capability_Type = 0
 	// Receive offers with revocable resources. See 'Resource'
 	// message for details.
 	// TODO(vinod): This is currently a no-op.
 	FrameworkInfo_Capability_REVOCABLE_RESOURCES FrameworkInfo_Capability_Type = 1
+	// Receive the TASK_KILLING TaskState when a task is being
+	// killed by an executor. The executor will examine this
+	// capability to determine whether it can send TASK_KILLING.
+	FrameworkInfo_Capability_TASK_KILLING_STATE FrameworkInfo_Capability_Type = 2
+	// Indicates whether the framework is aware of GPU resources.
+	// Frameworks that are aware of GPU resources are expected to
+	// avoid placing non-GPU workloads on GPU agents, in order
+	// to avoid occupying a GPU agent and preventing GPU workloads
+	// from running! Currently, if a framework is unaware of GPU
+	// resources, it will not be offered *any* of the resources on
+	// an agent with GPUs. This restriction is in place because we
+	// do not have a revocation mechanism that ensures GPU workloads
+	// can evict GPU agent occupants if necessary.
+	//
+	// TODO(bmahler): As we add revocation we can relax the
+	// restriction here. See MESOS-5634 for more information.
+	FrameworkInfo_Capability_GPU_RESOURCES FrameworkInfo_Capability_Type = 3
 )
 
 var FrameworkInfo_Capability_Type_name = map[int32]string{
+	0: "UNKNOWN",
 	1: "REVOCABLE_RESOURCES",
+	2: "TASK_KILLING_STATE",
+	3: "GPU_RESOURCES",
 }
 var FrameworkInfo_Capability_Type_value = map[string]int32{
+	"UNKNOWN":             0,
 	"REVOCABLE_RESOURCES": 1,
+	"TASK_KILLING_STATE":  2,
+	"GPU_RESOURCES":       3,
 }
 
 func (x FrameworkInfo_Capability_Type) Enum() *FrameworkInfo_Capability_Type {
@@ -193,6 +304,9 @@ func (x *FrameworkInfo_Capability_Type) UnmarshalJSON(data []byte) error {
 	}
 	*x = FrameworkInfo_Capability_Type(value)
 	return nil
+}
+func (FrameworkInfo_Capability_Type) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{13, 0, 0}
 }
 
 type Value_Type int32
@@ -232,6 +346,43 @@ func (x *Value_Type) UnmarshalJSON(data []byte) error {
 	}
 	*x = Value_Type(value)
 	return nil
+}
+func (Value_Type) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{20, 0} }
+
+type Resource_DiskInfo_Source_Type int32
+
+const (
+	Resource_DiskInfo_Source_PATH  Resource_DiskInfo_Source_Type = 1
+	Resource_DiskInfo_Source_MOUNT Resource_DiskInfo_Source_Type = 2
+)
+
+var Resource_DiskInfo_Source_Type_name = map[int32]string{
+	1: "PATH",
+	2: "MOUNT",
+}
+var Resource_DiskInfo_Source_Type_value = map[string]int32{
+	"PATH":  1,
+	"MOUNT": 2,
+}
+
+func (x Resource_DiskInfo_Source_Type) Enum() *Resource_DiskInfo_Source_Type {
+	p := new(Resource_DiskInfo_Source_Type)
+	*p = x
+	return p
+}
+func (x Resource_DiskInfo_Source_Type) String() string {
+	return proto.EnumName(Resource_DiskInfo_Source_Type_name, int32(x))
+}
+func (x *Resource_DiskInfo_Source_Type) UnmarshalJSON(data []byte) error {
+	value, err := proto.UnmarshalJSONEnum(Resource_DiskInfo_Source_Type_value, data, "Resource_DiskInfo_Source_Type")
+	if err != nil {
+		return err
+	}
+	*x = Resource_DiskInfo_Source_Type(value)
+	return nil
+}
+func (Resource_DiskInfo_Source_Type) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{22, 1, 1, 0}
 }
 
 type Offer_Operation_Type int32
@@ -275,6 +426,7 @@ func (x *Offer_Operation_Type) UnmarshalJSON(data []byte) error {
 	*x = Offer_Operation_Type(value)
 	return nil
 }
+func (Offer_Operation_Type) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{33, 0, 0} }
 
 // Describes the source of the task status update.
 type TaskStatus_Source int32
@@ -312,6 +464,7 @@ func (x *TaskStatus_Source) UnmarshalJSON(data []byte) error {
 	*x = TaskStatus_Source(value)
 	return nil
 }
+func (TaskStatus_Source) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{37, 0} }
 
 // Detailed reason for the task status update.
 //
@@ -320,30 +473,46 @@ func (x *TaskStatus_Source) UnmarshalJSON(data []byte) error {
 type TaskStatus_Reason int32
 
 const (
-	TaskStatus_REASON_COMMAND_EXECUTOR_FAILED TaskStatus_Reason = 0
-	TaskStatus_REASON_EXECUTOR_PREEMPTED      TaskStatus_Reason = 17
-	TaskStatus_REASON_EXECUTOR_TERMINATED     TaskStatus_Reason = 1
-	TaskStatus_REASON_EXECUTOR_UNREGISTERED   TaskStatus_Reason = 2
-	TaskStatus_REASON_FRAMEWORK_REMOVED       TaskStatus_Reason = 3
-	TaskStatus_REASON_GC_ERROR                TaskStatus_Reason = 4
-	TaskStatus_REASON_INVALID_FRAMEWORKID     TaskStatus_Reason = 5
-	TaskStatus_REASON_INVALID_OFFERS          TaskStatus_Reason = 6
-	TaskStatus_REASON_MASTER_DISCONNECTED     TaskStatus_Reason = 7
-	TaskStatus_REASON_MEMORY_LIMIT            TaskStatus_Reason = 8
-	TaskStatus_REASON_RECONCILIATION          TaskStatus_Reason = 9
-	TaskStatus_REASON_RESOURCES_UNKNOWN       TaskStatus_Reason = 18
-	TaskStatus_REASON_AGENT_DISCONNECTED      TaskStatus_Reason = 10
-	TaskStatus_REASON_AGENT_REMOVED           TaskStatus_Reason = 11
-	TaskStatus_REASON_AGENT_RESTARTED         TaskStatus_Reason = 12
-	TaskStatus_REASON_AGENT_UNKNOWN           TaskStatus_Reason = 13
-	TaskStatus_REASON_TASK_INVALID            TaskStatus_Reason = 14
-	TaskStatus_REASON_TASK_UNAUTHORIZED       TaskStatus_Reason = 15
-	TaskStatus_REASON_TASK_UNKNOWN            TaskStatus_Reason = 16
+	// TODO(jieyu): The default value when a caller doesn't check for
+	// presence is 0 and so ideally the 0 reason is not a valid one.
+	// Since this is not used anywhere, consider removing this reason.
+	TaskStatus_REASON_COMMAND_EXECUTOR_FAILED         TaskStatus_Reason = 0
+	TaskStatus_REASON_CONTAINER_LAUNCH_FAILED         TaskStatus_Reason = 21
+	TaskStatus_REASON_CONTAINER_LIMITATION            TaskStatus_Reason = 19
+	TaskStatus_REASON_CONTAINER_LIMITATION_DISK       TaskStatus_Reason = 20
+	TaskStatus_REASON_CONTAINER_LIMITATION_MEMORY     TaskStatus_Reason = 8
+	TaskStatus_REASON_CONTAINER_PREEMPTED             TaskStatus_Reason = 17
+	TaskStatus_REASON_CONTAINER_UPDATE_FAILED         TaskStatus_Reason = 22
+	TaskStatus_REASON_EXECUTOR_REGISTRATION_TIMEOUT   TaskStatus_Reason = 23
+	TaskStatus_REASON_EXECUTOR_REREGISTRATION_TIMEOUT TaskStatus_Reason = 24
+	TaskStatus_REASON_EXECUTOR_TERMINATED             TaskStatus_Reason = 1
+	TaskStatus_REASON_EXECUTOR_UNREGISTERED           TaskStatus_Reason = 2
+	TaskStatus_REASON_FRAMEWORK_REMOVED               TaskStatus_Reason = 3
+	TaskStatus_REASON_GC_ERROR                        TaskStatus_Reason = 4
+	TaskStatus_REASON_INVALID_FRAMEWORKID             TaskStatus_Reason = 5
+	TaskStatus_REASON_INVALID_OFFERS                  TaskStatus_Reason = 6
+	TaskStatus_REASON_MASTER_DISCONNECTED             TaskStatus_Reason = 7
+	TaskStatus_REASON_RECONCILIATION                  TaskStatus_Reason = 9
+	TaskStatus_REASON_RESOURCES_UNKNOWN               TaskStatus_Reason = 18
+	TaskStatus_REASON_AGENT_DISCONNECTED              TaskStatus_Reason = 10
+	TaskStatus_REASON_AGENT_REMOVED                   TaskStatus_Reason = 11
+	TaskStatus_REASON_AGENT_RESTARTED                 TaskStatus_Reason = 12
+	TaskStatus_REASON_AGENT_UNKNOWN                   TaskStatus_Reason = 13
+	TaskStatus_REASON_TASK_INVALID                    TaskStatus_Reason = 14
+	TaskStatus_REASON_TASK_UNAUTHORIZED               TaskStatus_Reason = 15
+	TaskStatus_REASON_TASK_UNKNOWN                    TaskStatus_Reason = 16
 )
 
 var TaskStatus_Reason_name = map[int32]string{
 	0:  "REASON_COMMAND_EXECUTOR_FAILED",
-	17: "REASON_EXECUTOR_PREEMPTED",
+	21: "REASON_CONTAINER_LAUNCH_FAILED",
+	19: "REASON_CONTAINER_LIMITATION",
+	20: "REASON_CONTAINER_LIMITATION_DISK",
+	8:  "REASON_CONTAINER_LIMITATION_MEMORY",
+	17: "REASON_CONTAINER_PREEMPTED",
+	22: "REASON_CONTAINER_UPDATE_FAILED",
+	23: "REASON_EXECUTOR_REGISTRATION_TIMEOUT",
+	24: "REASON_EXECUTOR_REREGISTRATION_TIMEOUT",
 	1:  "REASON_EXECUTOR_TERMINATED",
 	2:  "REASON_EXECUTOR_UNREGISTERED",
 	3:  "REASON_FRAMEWORK_REMOVED",
@@ -351,7 +520,6 @@ var TaskStatus_Reason_name = map[int32]string{
 	5:  "REASON_INVALID_FRAMEWORKID",
 	6:  "REASON_INVALID_OFFERS",
 	7:  "REASON_MASTER_DISCONNECTED",
-	8:  "REASON_MEMORY_LIMIT",
 	9:  "REASON_RECONCILIATION",
 	18: "REASON_RESOURCES_UNKNOWN",
 	10: "REASON_AGENT_DISCONNECTED",
@@ -363,25 +531,31 @@ var TaskStatus_Reason_name = map[int32]string{
 	16: "REASON_TASK_UNKNOWN",
 }
 var TaskStatus_Reason_value = map[string]int32{
-	"REASON_COMMAND_EXECUTOR_FAILED": 0,
-	"REASON_EXECUTOR_PREEMPTED":      17,
-	"REASON_EXECUTOR_TERMINATED":     1,
-	"REASON_EXECUTOR_UNREGISTERED":   2,
-	"REASON_FRAMEWORK_REMOVED":       3,
-	"REASON_GC_ERROR":                4,
-	"REASON_INVALID_FRAMEWORKID":     5,
-	"REASON_INVALID_OFFERS":          6,
-	"REASON_MASTER_DISCONNECTED":     7,
-	"REASON_MEMORY_LIMIT":            8,
-	"REASON_RECONCILIATION":          9,
-	"REASON_RESOURCES_UNKNOWN":       18,
-	"REASON_AGENT_DISCONNECTED":      10,
-	"REASON_AGENT_REMOVED":           11,
-	"REASON_AGENT_RESTARTED":         12,
-	"REASON_AGENT_UNKNOWN":           13,
-	"REASON_TASK_INVALID":            14,
-	"REASON_TASK_UNAUTHORIZED":       15,
-	"REASON_TASK_UNKNOWN":            16,
+	"REASON_COMMAND_EXECUTOR_FAILED":         0,
+	"REASON_CONTAINER_LAUNCH_FAILED":         21,
+	"REASON_CONTAINER_LIMITATION":            19,
+	"REASON_CONTAINER_LIMITATION_DISK":       20,
+	"REASON_CONTAINER_LIMITATION_MEMORY":     8,
+	"REASON_CONTAINER_PREEMPTED":             17,
+	"REASON_CONTAINER_UPDATE_FAILED":         22,
+	"REASON_EXECUTOR_REGISTRATION_TIMEOUT":   23,
+	"REASON_EXECUTOR_REREGISTRATION_TIMEOUT": 24,
+	"REASON_EXECUTOR_TERMINATED":             1,
+	"REASON_EXECUTOR_UNREGISTERED":           2,
+	"REASON_FRAMEWORK_REMOVED":               3,
+	"REASON_GC_ERROR":                        4,
+	"REASON_INVALID_FRAMEWORKID":             5,
+	"REASON_INVALID_OFFERS":                  6,
+	"REASON_MASTER_DISCONNECTED":             7,
+	"REASON_RECONCILIATION":                  9,
+	"REASON_RESOURCES_UNKNOWN":               18,
+	"REASON_AGENT_DISCONNECTED":              10,
+	"REASON_AGENT_REMOVED":                   11,
+	"REASON_AGENT_RESTARTED":                 12,
+	"REASON_AGENT_UNKNOWN":                   13,
+	"REASON_TASK_INVALID":                    14,
+	"REASON_TASK_UNAUTHORIZED":               15,
+	"REASON_TASK_UNKNOWN":                    16,
 }
 
 func (x TaskStatus_Reason) Enum() *TaskStatus_Reason {
@@ -400,54 +574,22 @@ func (x *TaskStatus_Reason) UnmarshalJSON(data []byte) error {
 	*x = TaskStatus_Reason(value)
 	return nil
 }
-
-type ACL_Entity_Type int32
-
-const (
-	ACL_Entity_SOME ACL_Entity_Type = 0
-	ACL_Entity_ANY  ACL_Entity_Type = 1
-	ACL_Entity_NONE ACL_Entity_Type = 2
-)
-
-var ACL_Entity_Type_name = map[int32]string{
-	0: "SOME",
-	1: "ANY",
-	2: "NONE",
-}
-var ACL_Entity_Type_value = map[string]int32{
-	"SOME": 0,
-	"ANY":  1,
-	"NONE": 2,
-}
-
-func (x ACL_Entity_Type) Enum() *ACL_Entity_Type {
-	p := new(ACL_Entity_Type)
-	*p = x
-	return p
-}
-func (x ACL_Entity_Type) String() string {
-	return proto.EnumName(ACL_Entity_Type_name, int32(x))
-}
-func (x *ACL_Entity_Type) UnmarshalJSON(data []byte) error {
-	value, err := proto.UnmarshalJSONEnum(ACL_Entity_Type_value, data, "ACL_Entity_Type")
-	if err != nil {
-		return err
-	}
-	*x = ACL_Entity_Type(value)
-	return nil
-}
+func (TaskStatus_Reason) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{37, 1} }
 
 type Image_Type int32
 
 const (
-	Image_APPC Image_Type = 1
+	Image_APPC   Image_Type = 1
+	Image_DOCKER Image_Type = 2
 )
 
 var Image_Type_name = map[int32]string{
 	1: "APPC",
+	2: "DOCKER",
 }
 var Image_Type_value = map[string]int32{
-	"APPC": 1,
+	"APPC":   1,
+	"DOCKER": 2,
 }
 
 func (x Image_Type) Enum() *Image_Type {
@@ -466,6 +608,7 @@ func (x *Image_Type) UnmarshalJSON(data []byte) error {
 	*x = Image_Type(value)
 	return nil
 }
+func (Image_Type) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{46, 0} }
 
 type Volume_Mode int32
 
@@ -499,6 +642,80 @@ func (x *Volume_Mode) UnmarshalJSON(data []byte) error {
 	*x = Volume_Mode(value)
 	return nil
 }
+func (Volume_Mode) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{47, 0} }
+
+type Volume_Source_Type int32
+
+const (
+	// This must be the first enum value in this list, to
+	// ensure that if 'type' is not set, the default value
+	// is UNKNOWN. This enables enum values to be added
+	// in a backwards-compatible way. See: MESOS-4997.
+	Volume_Source_UNKNOWN Volume_Source_Type = 0
+	// TODO(gyliu513): Add HOST_PATH and IMAGE as volume source type.
+	Volume_Source_DOCKER_VOLUME Volume_Source_Type = 1
+)
+
+var Volume_Source_Type_name = map[int32]string{
+	0: "UNKNOWN",
+	1: "DOCKER_VOLUME",
+}
+var Volume_Source_Type_value = map[string]int32{
+	"UNKNOWN":       0,
+	"DOCKER_VOLUME": 1,
+}
+
+func (x Volume_Source_Type) Enum() *Volume_Source_Type {
+	p := new(Volume_Source_Type)
+	*p = x
+	return p
+}
+func (x Volume_Source_Type) String() string {
+	return proto.EnumName(Volume_Source_Type_name, int32(x))
+}
+func (x *Volume_Source_Type) UnmarshalJSON(data []byte) error {
+	value, err := proto.UnmarshalJSONEnum(Volume_Source_Type_value, data, "Volume_Source_Type")
+	if err != nil {
+		return err
+	}
+	*x = Volume_Source_Type(value)
+	return nil
+}
+func (Volume_Source_Type) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{47, 0, 0} }
+
+type NetworkInfo_Protocol int32
+
+const (
+	NetworkInfo_IPv4 NetworkInfo_Protocol = 1
+	NetworkInfo_IPv6 NetworkInfo_Protocol = 2
+)
+
+var NetworkInfo_Protocol_name = map[int32]string{
+	1: "IPv4",
+	2: "IPv6",
+}
+var NetworkInfo_Protocol_value = map[string]int32{
+	"IPv4": 1,
+	"IPv6": 2,
+}
+
+func (x NetworkInfo_Protocol) Enum() *NetworkInfo_Protocol {
+	p := new(NetworkInfo_Protocol)
+	*p = x
+	return p
+}
+func (x NetworkInfo_Protocol) String() string {
+	return proto.EnumName(NetworkInfo_Protocol_name, int32(x))
+}
+func (x *NetworkInfo_Protocol) UnmarshalJSON(data []byte) error {
+	value, err := proto.UnmarshalJSONEnum(NetworkInfo_Protocol_value, data, "NetworkInfo_Protocol")
+	if err != nil {
+		return err
+	}
+	*x = NetworkInfo_Protocol(value)
+	return nil
+}
+func (NetworkInfo_Protocol) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{48, 0} }
 
 // All container implementation types.
 type ContainerInfo_Type int32
@@ -533,6 +750,7 @@ func (x *ContainerInfo_Type) UnmarshalJSON(data []byte) error {
 	*x = ContainerInfo_Type(value)
 	return nil
 }
+func (ContainerInfo_Type) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{49, 0} }
 
 // Network options.
 type ContainerInfo_DockerInfo_Network int32
@@ -541,17 +759,20 @@ const (
 	ContainerInfo_DockerInfo_HOST   ContainerInfo_DockerInfo_Network = 1
 	ContainerInfo_DockerInfo_BRIDGE ContainerInfo_DockerInfo_Network = 2
 	ContainerInfo_DockerInfo_NONE   ContainerInfo_DockerInfo_Network = 3
+	ContainerInfo_DockerInfo_USER   ContainerInfo_DockerInfo_Network = 4
 )
 
 var ContainerInfo_DockerInfo_Network_name = map[int32]string{
 	1: "HOST",
 	2: "BRIDGE",
 	3: "NONE",
+	4: "USER",
 }
 var ContainerInfo_DockerInfo_Network_value = map[string]int32{
 	"HOST":   1,
 	"BRIDGE": 2,
 	"NONE":   3,
+	"USER":   4,
 }
 
 func (x ContainerInfo_DockerInfo_Network) Enum() *ContainerInfo_DockerInfo_Network {
@@ -569,6 +790,9 @@ func (x *ContainerInfo_DockerInfo_Network) UnmarshalJSON(data []byte) error {
 	}
 	*x = ContainerInfo_DockerInfo_Network(value)
 	return nil
+}
+func (ContainerInfo_DockerInfo_Network) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{49, 0, 0}
 }
 
 type DiscoveryInfo_Visibility int32
@@ -606,6 +830,7 @@ func (x *DiscoveryInfo_Visibility) UnmarshalJSON(data []byte) error {
 	*x = DiscoveryInfo_Visibility(value)
 	return nil
 }
+func (DiscoveryInfo_Visibility) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{56, 0} }
 
 // *
 // A unique ID assigned to a framework. A framework can reuse this ID
@@ -615,9 +840,10 @@ type FrameworkID struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *FrameworkID) Reset()         { *m = FrameworkID{} }
-func (m *FrameworkID) String() string { return proto.CompactTextString(m) }
-func (*FrameworkID) ProtoMessage()    {}
+func (m *FrameworkID) Reset()                    { *m = FrameworkID{} }
+func (m *FrameworkID) String() string            { return proto.CompactTextString(m) }
+func (*FrameworkID) ProtoMessage()               {}
+func (*FrameworkID) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
 func (m *FrameworkID) GetValue() string {
 	if m != nil && m.Value != nil {
@@ -633,9 +859,10 @@ type OfferID struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *OfferID) Reset()         { *m = OfferID{} }
-func (m *OfferID) String() string { return proto.CompactTextString(m) }
-func (*OfferID) ProtoMessage()    {}
+func (m *OfferID) Reset()                    { *m = OfferID{} }
+func (m *OfferID) String() string            { return proto.CompactTextString(m) }
+func (*OfferID) ProtoMessage()               {}
+func (*OfferID) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
 
 func (m *OfferID) GetValue() string {
 	if m != nil && m.Value != nil {
@@ -653,9 +880,10 @@ type AgentID struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *AgentID) Reset()         { *m = AgentID{} }
-func (m *AgentID) String() string { return proto.CompactTextString(m) }
-func (*AgentID) ProtoMessage()    {}
+func (m *AgentID) Reset()                    { *m = AgentID{} }
+func (m *AgentID) String() string            { return proto.CompactTextString(m) }
+func (*AgentID) ProtoMessage()               {}
+func (*AgentID) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
 
 func (m *AgentID) GetValue() string {
 	if m != nil && m.Value != nil {
@@ -665,18 +893,20 @@ func (m *AgentID) GetValue() string {
 }
 
 // *
-// A framework generated ID to distinguish a task. The ID must remain
-// unique while the task is active. However, a framework can reuse an
-// ID _only_ if a previous task with the same ID has reached a
-// terminal state (e.g., TASK_FINISHED, TASK_LOST, TASK_KILLED, etc.).
+// A framework-generated ID to distinguish a task. The ID must remain
+// unique while the task is active. A framework can reuse an ID _only_
+// if the previous task with the same ID has reached a terminal state
+// (e.g., TASK_FINISHED, TASK_LOST, TASK_KILLED, etc.). However,
+// reusing task IDs is strongly discouraged (MESOS-2198).
 type TaskID struct {
 	Value            *string `protobuf:"bytes,1,req,name=value" json:"value,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *TaskID) Reset()         { *m = TaskID{} }
-func (m *TaskID) String() string { return proto.CompactTextString(m) }
-func (*TaskID) ProtoMessage()    {}
+func (m *TaskID) Reset()                    { *m = TaskID{} }
+func (m *TaskID) String() string            { return proto.CompactTextString(m) }
+func (*TaskID) ProtoMessage()               {}
+func (*TaskID) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
 
 func (m *TaskID) GetValue() string {
 	if m != nil && m.Value != nil {
@@ -686,17 +916,18 @@ func (m *TaskID) GetValue() string {
 }
 
 // *
-// A framework generated ID to distinguish an executor. Only one
+// A framework-generated ID to distinguish an executor. Only one
 // executor with the same ID can be active on the same agent at a
-// time.
+// time. However, reusing executor IDs is discouraged.
 type ExecutorID struct {
 	Value            *string `protobuf:"bytes,1,req,name=value" json:"value,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *ExecutorID) Reset()         { *m = ExecutorID{} }
-func (m *ExecutorID) String() string { return proto.CompactTextString(m) }
-func (*ExecutorID) ProtoMessage()    {}
+func (m *ExecutorID) Reset()                    { *m = ExecutorID{} }
+func (m *ExecutorID) String() string            { return proto.CompactTextString(m) }
+func (*ExecutorID) ProtoMessage()               {}
+func (*ExecutorID) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{4} }
 
 func (m *ExecutorID) GetValue() string {
 	if m != nil && m.Value != nil {
@@ -706,7 +937,7 @@ func (m *ExecutorID) GetValue() string {
 }
 
 // *
-// An agent generated ID to distinguish a container. The ID must be
+// An agent-generated ID to distinguish a container. The ID must be
 // unique between any active or completed containers on the agent. In
 // particular, containers for different runs of the same (framework,
 // executor) pair must be unique.
@@ -715,15 +946,54 @@ type ContainerID struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *ContainerID) Reset()         { *m = ContainerID{} }
-func (m *ContainerID) String() string { return proto.CompactTextString(m) }
-func (*ContainerID) ProtoMessage()    {}
+func (m *ContainerID) Reset()                    { *m = ContainerID{} }
+func (m *ContainerID) String() string            { return proto.CompactTextString(m) }
+func (*ContainerID) ProtoMessage()               {}
+func (*ContainerID) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{5} }
 
 func (m *ContainerID) GetValue() string {
 	if m != nil && m.Value != nil {
 		return *m.Value
 	}
 	return ""
+}
+
+// *
+// Represents time since the epoch, in nanoseconds.
+type TimeInfo struct {
+	Nanoseconds      *int64 `protobuf:"varint,1,req,name=nanoseconds" json:"nanoseconds,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *TimeInfo) Reset()                    { *m = TimeInfo{} }
+func (m *TimeInfo) String() string            { return proto.CompactTextString(m) }
+func (*TimeInfo) ProtoMessage()               {}
+func (*TimeInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{6} }
+
+func (m *TimeInfo) GetNanoseconds() int64 {
+	if m != nil && m.Nanoseconds != nil {
+		return *m.Nanoseconds
+	}
+	return 0
+}
+
+// *
+// Represents duration in nanoseconds.
+type DurationInfo struct {
+	Nanoseconds      *int64 `protobuf:"varint,1,req,name=nanoseconds" json:"nanoseconds,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *DurationInfo) Reset()                    { *m = DurationInfo{} }
+func (m *DurationInfo) String() string            { return proto.CompactTextString(m) }
+func (*DurationInfo) ProtoMessage()               {}
+func (*DurationInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{7} }
+
+func (m *DurationInfo) GetNanoseconds() int64 {
+	if m != nil && m.Nanoseconds != nil {
+		return *m.Nanoseconds
+	}
+	return 0
 }
 
 // *
@@ -738,9 +1008,10 @@ type Address struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Address) Reset()         { *m = Address{} }
-func (m *Address) String() string { return proto.CompactTextString(m) }
-func (*Address) ProtoMessage()    {}
+func (m *Address) Reset()                    { *m = Address{} }
+func (m *Address) String() string            { return proto.CompactTextString(m) }
+func (*Address) ProtoMessage()               {}
+func (*Address) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{8} }
 
 func (m *Address) GetHostname() string {
 	if m != nil && m.Hostname != nil {
@@ -774,9 +1045,10 @@ type URL struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *URL) Reset()         { *m = URL{} }
-func (m *URL) String() string { return proto.CompactTextString(m) }
-func (*URL) ProtoMessage()    {}
+func (m *URL) Reset()                    { *m = URL{} }
+func (m *URL) String() string            { return proto.CompactTextString(m) }
+func (*URL) ProtoMessage()               {}
+func (*URL) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{9} }
 
 func (m *URL) GetScheme() string {
 	if m != nil && m.Scheme != nil {
@@ -814,6 +1086,107 @@ func (m *URL) GetFragment() string {
 }
 
 // *
+// Represents an interval, from a given start time over a given duration.
+// This interval pertains to an unavailability event, such as maintenance,
+// and is not a generic interval.
+type Unavailability struct {
+	Start *TimeInfo `protobuf:"bytes,1,req,name=start" json:"start,omitempty"`
+	// When added to `start`, this represents the end of the interval.
+	// If unspecified, the duration is assumed to be infinite.
+	Duration         *DurationInfo `protobuf:"bytes,2,opt,name=duration" json:"duration,omitempty"`
+	XXX_unrecognized []byte        `json:"-"`
+}
+
+func (m *Unavailability) Reset()                    { *m = Unavailability{} }
+func (m *Unavailability) String() string            { return proto.CompactTextString(m) }
+func (*Unavailability) ProtoMessage()               {}
+func (*Unavailability) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{10} }
+
+func (m *Unavailability) GetStart() *TimeInfo {
+	if m != nil {
+		return m.Start
+	}
+	return nil
+}
+
+func (m *Unavailability) GetDuration() *DurationInfo {
+	if m != nil {
+		return m.Duration
+	}
+	return nil
+}
+
+// *
+// Represents a single machine, which may hold one or more agents.
+//
+// NOTE: In order to match an agent to a machine, both the `hostname` and
+// `ip` must match the values advertised by the agent to the master.
+// Hostname is not case-sensitive.
+type MachineID struct {
+	Hostname         *string `protobuf:"bytes,1,opt,name=hostname" json:"hostname,omitempty"`
+	Ip               *string `protobuf:"bytes,2,opt,name=ip" json:"ip,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *MachineID) Reset()                    { *m = MachineID{} }
+func (m *MachineID) String() string            { return proto.CompactTextString(m) }
+func (*MachineID) ProtoMessage()               {}
+func (*MachineID) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{11} }
+
+func (m *MachineID) GetHostname() string {
+	if m != nil && m.Hostname != nil {
+		return *m.Hostname
+	}
+	return ""
+}
+
+func (m *MachineID) GetIp() string {
+	if m != nil && m.Ip != nil {
+		return *m.Ip
+	}
+	return ""
+}
+
+// *
+// Holds information about a single machine, its `mode`, and any other
+// relevant information which may affect the behavior of the machine.
+type MachineInfo struct {
+	Id   *MachineID        `protobuf:"bytes,1,req,name=id" json:"id,omitempty"`
+	Mode *MachineInfo_Mode `protobuf:"varint,2,opt,name=mode,enum=mesos.v1.MachineInfo_Mode" json:"mode,omitempty"`
+	// Signifies that the machine may be unavailable during the given interval.
+	// See comments in `Unavailability` and for the `unavailability` fields
+	// in `Offer` and `InverseOffer` for more information.
+	Unavailability   *Unavailability `protobuf:"bytes,3,opt,name=unavailability" json:"unavailability,omitempty"`
+	XXX_unrecognized []byte          `json:"-"`
+}
+
+func (m *MachineInfo) Reset()                    { *m = MachineInfo{} }
+func (m *MachineInfo) String() string            { return proto.CompactTextString(m) }
+func (*MachineInfo) ProtoMessage()               {}
+func (*MachineInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{12} }
+
+func (m *MachineInfo) GetId() *MachineID {
+	if m != nil {
+		return m.Id
+	}
+	return nil
+}
+
+func (m *MachineInfo) GetMode() MachineInfo_Mode {
+	if m != nil && m.Mode != nil {
+		return *m.Mode
+	}
+	return MachineInfo_UP
+}
+
+func (m *MachineInfo) GetUnavailability() *Unavailability {
+	if m != nil {
+		return m.Unavailability
+	}
+	return nil
+}
+
+// *
 // Describes a framework.
 type FrameworkInfo struct {
 	// Used to determine the Unix user that an executor or task should
@@ -828,10 +1201,14 @@ type FrameworkInfo struct {
 	// MesosSchedulerDriver expects the scheduler is performing
 	// failover).
 	Id *FrameworkID `protobuf:"bytes,3,opt,name=id" json:"id,omitempty"`
-	// The amount of time that the master will wait for the scheduler to
-	// failover before it tears down the framework by killing all its
-	// tasks/executors. This should be non-zero if a framework expects
-	// to reconnect after a failover and not lose its tasks/executors.
+	// The amount of time (in seconds) that the master will wait for the
+	// scheduler to failover before it tears down the framework by
+	// killing all its tasks/executors. This should be non-zero if a
+	// framework expects to reconnect after a failure and not lose its
+	// tasks/executors.
+	//
+	// NOTE: To avoid accidental destruction of tasks, production
+	// frameworks typically set this to a large value (e.g., 1 week).
 	FailoverTimeout *float64 `protobuf:"fixed64,4,opt,name=failover_timeout,def=0" json:"failover_timeout,omitempty"`
 	// If set, framework pid, executor pids and status updates are
 	// checkpointed to disk by the agents. Checkpointing allows a
@@ -858,13 +1235,19 @@ type FrameworkInfo struct {
 	// This field allows a framework to advertise its set of
 	// capabilities (e.g., ability to receive offers for revocable
 	// resources).
-	Capabilities     []*FrameworkInfo_Capability `protobuf:"bytes,10,rep,name=capabilities" json:"capabilities,omitempty"`
-	XXX_unrecognized []byte                      `json:"-"`
+	Capabilities []*FrameworkInfo_Capability `protobuf:"bytes,10,rep,name=capabilities" json:"capabilities,omitempty"`
+	// Labels are free-form key value pairs supplied by the framework
+	// scheduler (e.g., to describe additional functionality offered by
+	// the framework). These labels are not interpreted by Mesos itself.
+	// Labels should not contain duplicate key-value pairs.
+	Labels           *Labels `protobuf:"bytes,11,opt,name=labels" json:"labels,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *FrameworkInfo) Reset()         { *m = FrameworkInfo{} }
-func (m *FrameworkInfo) String() string { return proto.CompactTextString(m) }
-func (*FrameworkInfo) ProtoMessage()    {}
+func (m *FrameworkInfo) Reset()                    { *m = FrameworkInfo{} }
+func (m *FrameworkInfo) String() string            { return proto.CompactTextString(m) }
+func (*FrameworkInfo) ProtoMessage()               {}
+func (*FrameworkInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{13} }
 
 const Default_FrameworkInfo_FailoverTimeout float64 = 0
 const Default_FrameworkInfo_Checkpoint bool = false
@@ -940,20 +1323,29 @@ func (m *FrameworkInfo) GetCapabilities() []*FrameworkInfo_Capability {
 	return nil
 }
 
+func (m *FrameworkInfo) GetLabels() *Labels {
+	if m != nil {
+		return m.Labels
+	}
+	return nil
+}
+
 type FrameworkInfo_Capability struct {
-	Type             *FrameworkInfo_Capability_Type `protobuf:"varint,1,req,name=type,enum=mesosproto.FrameworkInfo_Capability_Type" json:"type,omitempty"`
+	// Enum fields should be optional, see: MESOS-4997.
+	Type             *FrameworkInfo_Capability_Type `protobuf:"varint,1,opt,name=type,enum=mesos.v1.FrameworkInfo_Capability_Type" json:"type,omitempty"`
 	XXX_unrecognized []byte                         `json:"-"`
 }
 
-func (m *FrameworkInfo_Capability) Reset()         { *m = FrameworkInfo_Capability{} }
-func (m *FrameworkInfo_Capability) String() string { return proto.CompactTextString(m) }
-func (*FrameworkInfo_Capability) ProtoMessage()    {}
+func (m *FrameworkInfo_Capability) Reset()                    { *m = FrameworkInfo_Capability{} }
+func (m *FrameworkInfo_Capability) String() string            { return proto.CompactTextString(m) }
+func (*FrameworkInfo_Capability) ProtoMessage()               {}
+func (*FrameworkInfo_Capability) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{13, 0} }
 
 func (m *FrameworkInfo_Capability) GetType() FrameworkInfo_Capability_Type {
 	if m != nil && m.Type != nil {
 		return *m.Type
 	}
-	return FrameworkInfo_Capability_REVOCABLE_RESOURCES
+	return FrameworkInfo_Capability_UNKNOWN
 }
 
 // *
@@ -970,7 +1362,7 @@ type HealthCheck struct {
 	IntervalSeconds *float64 `protobuf:"fixed64,3,opt,name=interval_seconds,def=10" json:"interval_seconds,omitempty"`
 	// Amount of time to wait for the health check to complete.
 	TimeoutSeconds *float64 `protobuf:"fixed64,4,opt,name=timeout_seconds,def=20" json:"timeout_seconds,omitempty"`
-	// Number of consecutive failures until considered unhealthy.
+	// Number of consecutive failures until signaling kill task.
 	ConsecutiveFailures *uint32 `protobuf:"varint,5,opt,name=consecutive_failures,def=3" json:"consecutive_failures,omitempty"`
 	// Amount of time to allow failed health checks since launch.
 	GracePeriodSeconds *float64 `protobuf:"fixed64,6,opt,name=grace_period_seconds,def=10" json:"grace_period_seconds,omitempty"`
@@ -979,9 +1371,10 @@ type HealthCheck struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *HealthCheck) Reset()         { *m = HealthCheck{} }
-func (m *HealthCheck) String() string { return proto.CompactTextString(m) }
-func (*HealthCheck) ProtoMessage()    {}
+func (m *HealthCheck) Reset()                    { *m = HealthCheck{} }
+func (m *HealthCheck) String() string            { return proto.CompactTextString(m) }
+func (*HealthCheck) ProtoMessage()               {}
+func (*HealthCheck) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{14} }
 
 const Default_HealthCheck_DelaySeconds float64 = 15
 const Default_HealthCheck_IntervalSeconds float64 = 10
@@ -1051,9 +1444,10 @@ type HealthCheck_HTTP struct {
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *HealthCheck_HTTP) Reset()         { *m = HealthCheck_HTTP{} }
-func (m *HealthCheck_HTTP) String() string { return proto.CompactTextString(m) }
-func (*HealthCheck_HTTP) ProtoMessage()    {}
+func (m *HealthCheck_HTTP) Reset()                    { *m = HealthCheck_HTTP{} }
+func (m *HealthCheck_HTTP) String() string            { return proto.CompactTextString(m) }
+func (*HealthCheck_HTTP) ProtoMessage()               {}
+func (*HealthCheck_HTTP) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{14, 0} }
 
 const Default_HealthCheck_HTTP_Path string = "/"
 
@@ -1079,6 +1473,47 @@ func (m *HealthCheck_HTTP) GetStatuses() []uint32 {
 }
 
 // *
+// Describes a kill policy for a task. Currently does not express
+// different policies (e.g. hitting HTTP endpoints), only controls
+// how long to wait between graceful and forcible task kill:
+//
+//     graceful kill --------------> forcible kill
+//                    grace_period
+//
+// Kill policies are best-effort, because machine failures / forcible
+// terminations may occur.
+//
+// NOTE: For executor-less command-based tasks, the kill is performed
+// via sending a signal to the task process: SIGTERM for the graceful
+// kill and SIGKILL for the forcible kill. For the docker executor-less
+// tasks the grace period is passed to 'docker stop --time'.
+type KillPolicy struct {
+	// The grace period specifies how long to wait before forcibly
+	// killing the task. It is recommended to attempt to gracefully
+	// kill the task (and send TASK_KILLING) to indicate that the
+	// graceful kill is in progress. Once the grace period elapses,
+	// if the task has not terminated, a forcible kill should occur.
+	// The task should not assume that it will always be allotted
+	// the full grace period. For example, the executor may be
+	// shutdown more quickly by the agent, or failures / forcible
+	// terminations may occur.
+	GracePeriod      *DurationInfo `protobuf:"bytes,1,opt,name=grace_period" json:"grace_period,omitempty"`
+	XXX_unrecognized []byte        `json:"-"`
+}
+
+func (m *KillPolicy) Reset()                    { *m = KillPolicy{} }
+func (m *KillPolicy) String() string            { return proto.CompactTextString(m) }
+func (*KillPolicy) ProtoMessage()               {}
+func (*KillPolicy) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{15} }
+
+func (m *KillPolicy) GetGracePeriod() *DurationInfo {
+	if m != nil {
+		return m.GracePeriod
+	}
+	return nil
+}
+
+// *
 // Describes a command, executed via: '/bin/sh -c value'. Any URIs specified
 // are fetched before executing the command.  If the executable field for an
 // uri is set, executable file permission is set on the downloaded file.
@@ -1088,11 +1523,8 @@ func (m *HealthCheck_HTTP) GetStatuses() []uint32 {
 // false. In addition, any environment variables are set before executing
 // the command (so they can be used to "parameterize" your command).
 type CommandInfo struct {
-	// NOTE: MesosContainerizer does currently not support this
-	// attribute and tasks supplying a 'container' will fail.
-	Container   *CommandInfo_ContainerInfo `protobuf:"bytes,4,opt,name=container" json:"container,omitempty"`
-	Uris        []*CommandInfo_URI         `protobuf:"bytes,1,rep,name=uris" json:"uris,omitempty"`
-	Environment *Environment               `protobuf:"bytes,2,opt,name=environment" json:"environment,omitempty"`
+	Uris        []*CommandInfo_URI `protobuf:"bytes,1,rep,name=uris" json:"uris,omitempty"`
+	Environment *Environment       `protobuf:"bytes,2,opt,name=environment" json:"environment,omitempty"`
 	// There are two ways to specify the command:
 	// 1) If 'shell == true', the command will be launched via shell
 	// 		(i.e., /bin/sh -c 'value'). The 'value' specified will be
@@ -1116,18 +1548,12 @@ type CommandInfo struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *CommandInfo) Reset()         { *m = CommandInfo{} }
-func (m *CommandInfo) String() string { return proto.CompactTextString(m) }
-func (*CommandInfo) ProtoMessage()    {}
+func (m *CommandInfo) Reset()                    { *m = CommandInfo{} }
+func (m *CommandInfo) String() string            { return proto.CompactTextString(m) }
+func (*CommandInfo) ProtoMessage()               {}
+func (*CommandInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{16} }
 
 const Default_CommandInfo_Shell bool = true
-
-func (m *CommandInfo) GetContainer() *CommandInfo_ContainerInfo {
-	if m != nil {
-		return m.Container
-	}
-	return nil
-}
 
 func (m *CommandInfo) GetUris() []*CommandInfo_URI {
 	if m != nil {
@@ -1189,13 +1615,20 @@ type CommandInfo_URI struct {
 	// may get evicted at any time, which then leads to renewed
 	// downloading. See also "docs/fetcher.md" and
 	// "docs/fetcher-cache-internals.md".
-	Cache            *bool  `protobuf:"varint,4,opt,name=cache" json:"cache,omitempty"`
-	XXX_unrecognized []byte `json:"-"`
+	Cache *bool `protobuf:"varint,4,opt,name=cache" json:"cache,omitempty"`
+	// The fetcher's default behavior is to use the URI string's basename to
+	// name the local copy. If this field is provided, the local copy will be
+	// named with its value instead. If there is a directory component (which
+	// must be a relative path), the local copy will be stored in that
+	// subdirectory inside the sandbox.
+	OutputFile       *string `protobuf:"bytes,5,opt,name=output_file" json:"output_file,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *CommandInfo_URI) Reset()         { *m = CommandInfo_URI{} }
-func (m *CommandInfo_URI) String() string { return proto.CompactTextString(m) }
-func (*CommandInfo_URI) ProtoMessage()    {}
+func (m *CommandInfo_URI) Reset()                    { *m = CommandInfo_URI{} }
+func (m *CommandInfo_URI) String() string            { return proto.CompactTextString(m) }
+func (*CommandInfo_URI) ProtoMessage()               {}
+func (*CommandInfo_URI) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{16, 0} }
 
 const Default_CommandInfo_URI_Extract bool = true
 
@@ -1227,39 +1660,11 @@ func (m *CommandInfo_URI) GetCache() bool {
 	return false
 }
 
-// Describes a container.
-// Not all containerizers currently implement ContainerInfo, so it
-// is possible that a launched task will fail due to supplying this
-// attribute.
-// NOTE: The containerizer API is currently in an early beta or
-// even alpha state. Some details, like the exact semantics of an
-// "image" or "options" are not yet hardened.
-// TODO(tillt): Describe the exact scheme and semantics of "image"
-// and "options".
-type CommandInfo_ContainerInfo struct {
-	// URI describing the container image name.
-	Image *string `protobuf:"bytes,1,req,name=image" json:"image,omitempty"`
-	// Describes additional options passed to the containerizer.
-	Options          []string `protobuf:"bytes,2,rep,name=options" json:"options,omitempty"`
-	XXX_unrecognized []byte   `json:"-"`
-}
-
-func (m *CommandInfo_ContainerInfo) Reset()         { *m = CommandInfo_ContainerInfo{} }
-func (m *CommandInfo_ContainerInfo) String() string { return proto.CompactTextString(m) }
-func (*CommandInfo_ContainerInfo) ProtoMessage()    {}
-
-func (m *CommandInfo_ContainerInfo) GetImage() string {
-	if m != nil && m.Image != nil {
-		return *m.Image
+func (m *CommandInfo_URI) GetOutputFile() string {
+	if m != nil && m.OutputFile != nil {
+		return *m.OutputFile
 	}
 	return ""
-}
-
-func (m *CommandInfo_ContainerInfo) GetOptions() []string {
-	if m != nil {
-		return m.Options
-	}
-	return nil
 }
 
 // *
@@ -1282,19 +1687,37 @@ type ExecutorInfo struct {
 	// NOTE: 'source' is exposed alongside the resource usage of the
 	// executor via JSON on the agent. This allows users to import usage
 	// information into a time series database for monitoring.
+	//
+	// This field is deprecated since 1.0. Please use labels for
+	// free-form metadata instead.
 	Source *string `protobuf:"bytes,10,opt,name=source" json:"source,omitempty"`
 	Data   []byte  `protobuf:"bytes,4,opt,name=data" json:"data,omitempty"`
 	// Service discovery information for the executor. It is not
 	// interpreted or acted upon by Mesos. It is up to a service
 	// discovery system to use this information as needed and to handle
 	// executors without service discovery information.
-	Discovery        *DiscoveryInfo `protobuf:"bytes,12,opt,name=discovery" json:"discovery,omitempty"`
-	XXX_unrecognized []byte         `json:"-"`
+	Discovery *DiscoveryInfo `protobuf:"bytes,12,opt,name=discovery" json:"discovery,omitempty"`
+	// When shutting down an executor the agent will wait in a
+	// best-effort manner for the grace period specified here
+	// before forcibly destroying the container. The executor
+	// must not assume that it will always be allotted the full
+	// grace period, as the agent may decide to allot a shorter
+	// period and failures / forcible terminations may occur.
+	ShutdownGracePeriod *DurationInfo `protobuf:"bytes,13,opt,name=shutdown_grace_period" json:"shutdown_grace_period,omitempty"`
+	// Labels are free-form key value pairs which are exposed through
+	// master and agent endpoints. Labels will not be interpreted or
+	// acted upon by Mesos itself. As opposed to the data field, labels
+	// will be kept in memory on master and agent processes. Therefore,
+	// labels should be used to tag executors with lightweight metadata.
+	// Labels should not contain duplicate key-value pairs.
+	Labels           *Labels `protobuf:"bytes,14,opt,name=labels" json:"labels,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *ExecutorInfo) Reset()         { *m = ExecutorInfo{} }
-func (m *ExecutorInfo) String() string { return proto.CompactTextString(m) }
-func (*ExecutorInfo) ProtoMessage()    {}
+func (m *ExecutorInfo) Reset()                    { *m = ExecutorInfo{} }
+func (m *ExecutorInfo) String() string            { return proto.CompactTextString(m) }
+func (*ExecutorInfo) ProtoMessage()               {}
+func (*ExecutorInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{17} }
 
 func (m *ExecutorInfo) GetExecutorId() *ExecutorID {
 	if m != nil {
@@ -1359,6 +1782,20 @@ func (m *ExecutorInfo) GetDiscovery() *DiscoveryInfo {
 	return nil
 }
 
+func (m *ExecutorInfo) GetShutdownGracePeriod() *DurationInfo {
+	if m != nil {
+		return m.ShutdownGracePeriod
+	}
+	return nil
+}
+
+func (m *ExecutorInfo) GetLabels() *Labels {
+	if m != nil {
+		return m.Labels
+	}
+	return nil
+}
+
 // *
 // Describes a master. This will probably have more fields in the
 // future which might be used, for example, to link a framework webui
@@ -1391,9 +1828,10 @@ type MasterInfo struct {
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *MasterInfo) Reset()         { *m = MasterInfo{} }
-func (m *MasterInfo) String() string { return proto.CompactTextString(m) }
-func (*MasterInfo) ProtoMessage()    {}
+func (m *MasterInfo) Reset()                    { *m = MasterInfo{} }
+func (m *MasterInfo) String() string            { return proto.CompactTextString(m) }
+func (*MasterInfo) ProtoMessage()               {}
+func (*MasterInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{18} }
 
 const Default_MasterInfo_Port uint32 = 5050
 
@@ -1449,9 +1887,7 @@ func (m *MasterInfo) GetAddress() *Address {
 // *
 // Describes an agent. Note that the 'id' field is only available
 // after an agent is registered with the master, and is made available
-// here to facilitate re-registration.  If checkpoint is set, the
-// agent is checkpointing its own information and potentially
-// frameworks' information (if a framework has checkpointing enabled).
+// here to facilitate re-registration.
 type AgentInfo struct {
 	Hostname         *string      `protobuf:"bytes,1,req,name=hostname" json:"hostname,omitempty"`
 	Port             *int32       `protobuf:"varint,8,opt,name=port,def=5051" json:"port,omitempty"`
@@ -1461,9 +1897,10 @@ type AgentInfo struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *AgentInfo) Reset()         { *m = AgentInfo{} }
-func (m *AgentInfo) String() string { return proto.CompactTextString(m) }
-func (*AgentInfo) ProtoMessage()    {}
+func (m *AgentInfo) Reset()                    { *m = AgentInfo{} }
+func (m *AgentInfo) String() string            { return proto.CompactTextString(m) }
+func (*AgentInfo) ProtoMessage()               {}
+func (*AgentInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{19} }
 
 const Default_AgentInfo_Port int32 = 5051
 
@@ -1506,7 +1943,7 @@ func (m *AgentInfo) GetId() *AgentID {
 // Describes an Attribute or Resource "value". A value is described
 // using the standard protocol buffer "union" trick.
 type Value struct {
-	Type             *Value_Type   `protobuf:"varint,1,req,name=type,enum=mesosproto.Value_Type" json:"type,omitempty"`
+	Type             *Value_Type   `protobuf:"varint,1,req,name=type,enum=mesos.v1.Value_Type" json:"type,omitempty"`
 	Scalar           *Value_Scalar `protobuf:"bytes,2,opt,name=scalar" json:"scalar,omitempty"`
 	Ranges           *Value_Ranges `protobuf:"bytes,3,opt,name=ranges" json:"ranges,omitempty"`
 	Set              *Value_Set    `protobuf:"bytes,4,opt,name=set" json:"set,omitempty"`
@@ -1514,9 +1951,10 @@ type Value struct {
 	XXX_unrecognized []byte        `json:"-"`
 }
 
-func (m *Value) Reset()         { *m = Value{} }
-func (m *Value) String() string { return proto.CompactTextString(m) }
-func (*Value) ProtoMessage()    {}
+func (m *Value) Reset()                    { *m = Value{} }
+func (m *Value) String() string            { return proto.CompactTextString(m) }
+func (*Value) ProtoMessage()               {}
+func (*Value) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{20} }
 
 func (m *Value) GetType() Value_Type {
 	if m != nil && m.Type != nil {
@@ -1554,13 +1992,22 @@ func (m *Value) GetText() *Value_Text {
 }
 
 type Value_Scalar struct {
+	// Scalar values are represented using floating point. To reduce
+	// the chance of unpredictable floating point behavior due to
+	// roundoff error, Mesos only supports three decimal digits of
+	// precision for scalar resource values. That is, floating point
+	// values are converted to a fixed point format that supports
+	// three decimal digits of precision, and then converted back to
+	// floating point on output. Any additional precision in scalar
+	// resource values is discarded (via rounding).
 	Value            *float64 `protobuf:"fixed64,1,req,name=value" json:"value,omitempty"`
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *Value_Scalar) Reset()         { *m = Value_Scalar{} }
-func (m *Value_Scalar) String() string { return proto.CompactTextString(m) }
-func (*Value_Scalar) ProtoMessage()    {}
+func (m *Value_Scalar) Reset()                    { *m = Value_Scalar{} }
+func (m *Value_Scalar) String() string            { return proto.CompactTextString(m) }
+func (*Value_Scalar) ProtoMessage()               {}
+func (*Value_Scalar) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{20, 0} }
 
 func (m *Value_Scalar) GetValue() float64 {
 	if m != nil && m.Value != nil {
@@ -1575,9 +2022,10 @@ type Value_Range struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Value_Range) Reset()         { *m = Value_Range{} }
-func (m *Value_Range) String() string { return proto.CompactTextString(m) }
-func (*Value_Range) ProtoMessage()    {}
+func (m *Value_Range) Reset()                    { *m = Value_Range{} }
+func (m *Value_Range) String() string            { return proto.CompactTextString(m) }
+func (*Value_Range) ProtoMessage()               {}
+func (*Value_Range) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{20, 1} }
 
 func (m *Value_Range) GetBegin() uint64 {
 	if m != nil && m.Begin != nil {
@@ -1598,9 +2046,10 @@ type Value_Ranges struct {
 	XXX_unrecognized []byte         `json:"-"`
 }
 
-func (m *Value_Ranges) Reset()         { *m = Value_Ranges{} }
-func (m *Value_Ranges) String() string { return proto.CompactTextString(m) }
-func (*Value_Ranges) ProtoMessage()    {}
+func (m *Value_Ranges) Reset()                    { *m = Value_Ranges{} }
+func (m *Value_Ranges) String() string            { return proto.CompactTextString(m) }
+func (*Value_Ranges) ProtoMessage()               {}
+func (*Value_Ranges) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{20, 2} }
 
 func (m *Value_Ranges) GetRange() []*Value_Range {
 	if m != nil {
@@ -1614,9 +2063,10 @@ type Value_Set struct {
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *Value_Set) Reset()         { *m = Value_Set{} }
-func (m *Value_Set) String() string { return proto.CompactTextString(m) }
-func (*Value_Set) ProtoMessage()    {}
+func (m *Value_Set) Reset()                    { *m = Value_Set{} }
+func (m *Value_Set) String() string            { return proto.CompactTextString(m) }
+func (*Value_Set) ProtoMessage()               {}
+func (*Value_Set) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{20, 3} }
 
 func (m *Value_Set) GetItem() []string {
 	if m != nil {
@@ -1630,9 +2080,10 @@ type Value_Text struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Value_Text) Reset()         { *m = Value_Text{} }
-func (m *Value_Text) String() string { return proto.CompactTextString(m) }
-func (*Value_Text) ProtoMessage()    {}
+func (m *Value_Text) Reset()                    { *m = Value_Text{} }
+func (m *Value_Text) String() string            { return proto.CompactTextString(m) }
+func (*Value_Text) ProtoMessage()               {}
+func (*Value_Text) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{20, 4} }
 
 func (m *Value_Text) GetValue() string {
 	if m != nil && m.Value != nil {
@@ -1647,7 +2098,7 @@ func (m *Value_Text) GetValue() string {
 // change in the future and attributes may only be string based.
 type Attribute struct {
 	Name             *string       `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
-	Type             *Value_Type   `protobuf:"varint,2,req,name=type,enum=mesosproto.Value_Type" json:"type,omitempty"`
+	Type             *Value_Type   `protobuf:"varint,2,req,name=type,enum=mesos.v1.Value_Type" json:"type,omitempty"`
 	Scalar           *Value_Scalar `protobuf:"bytes,3,opt,name=scalar" json:"scalar,omitempty"`
 	Ranges           *Value_Ranges `protobuf:"bytes,4,opt,name=ranges" json:"ranges,omitempty"`
 	Set              *Value_Set    `protobuf:"bytes,6,opt,name=set" json:"set,omitempty"`
@@ -1655,9 +2106,10 @@ type Attribute struct {
 	XXX_unrecognized []byte        `json:"-"`
 }
 
-func (m *Attribute) Reset()         { *m = Attribute{} }
-func (m *Attribute) String() string { return proto.CompactTextString(m) }
-func (*Attribute) ProtoMessage()    {}
+func (m *Attribute) Reset()                    { *m = Attribute{} }
+func (m *Attribute) String() string            { return proto.CompactTextString(m) }
+func (*Attribute) ProtoMessage()               {}
+func (*Attribute) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{21} }
 
 func (m *Attribute) GetName() string {
 	if m != nil && m.Name != nil {
@@ -1702,20 +2154,27 @@ func (m *Attribute) GetText() *Value_Text {
 }
 
 // *
-// Describes a resource on a machine. A resource can take on one of
-// three types: scalar (double), a list of finite and discrete ranges
-// (e.g., [1-10, 20-30]), or a set of items. A resource is described
-// using the standard protocol buffer "union" trick.
+// Describes a resource on a machine. The `name` field is a string
+// like "cpus" or "mem" that indicates which kind of resource this is;
+// the rest of the fields describe the properties of the resource. A
+// resource can take on one of three types: scalar (double), a list of
+// finite and discrete ranges (e.g., [1-10, 20-30]), or a set of
+// items. A resource is described using the standard protocol buffer
+// "union" trick.
 //
-// TODO(benh): Add better support for "expected" resources (e.g.,
-// cpus, memory, disk, network).
+// Note that "disk" and "mem" resources are scalar values expressed in
+// megabytes. Fractional "cpus" values are allowed (e.g., "0.5"),
+// which correspond to partial shares of a CPU.
 type Resource struct {
 	Name   *string       `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
-	Type   *Value_Type   `protobuf:"varint,2,req,name=type,enum=mesosproto.Value_Type" json:"type,omitempty"`
+	Type   *Value_Type   `protobuf:"varint,2,req,name=type,enum=mesos.v1.Value_Type" json:"type,omitempty"`
 	Scalar *Value_Scalar `protobuf:"bytes,3,opt,name=scalar" json:"scalar,omitempty"`
 	Ranges *Value_Ranges `protobuf:"bytes,4,opt,name=ranges" json:"ranges,omitempty"`
 	Set    *Value_Set    `protobuf:"bytes,5,opt,name=set" json:"set,omitempty"`
-	Role   *string       `protobuf:"bytes,6,opt,name=role,def=*" json:"role,omitempty"`
+	// The role that this resource is reserved for. If "*", this indicates
+	// that the resource is unreserved. Otherwise, the resource will only
+	// be offered to frameworks that belong to this role.
+	Role *string `protobuf:"bytes,6,opt,name=role,def=*" json:"role,omitempty"`
 	// If this is set, this resource was dynamically reserved by an
 	// operator or a framework. Otherwise, this resource is either unreserved
 	// or statically reserved by an operator via the --resources flag.
@@ -1731,9 +2190,10 @@ type Resource struct {
 	XXX_unrecognized []byte                  `json:"-"`
 }
 
-func (m *Resource) Reset()         { *m = Resource{} }
-func (m *Resource) String() string { return proto.CompactTextString(m) }
-func (*Resource) ProtoMessage()    {}
+func (m *Resource) Reset()                    { *m = Resource{} }
+func (m *Resource) String() string            { return proto.CompactTextString(m) }
+func (*Resource) ProtoMessage()               {}
+func (*Resource) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{22} }
 
 const Default_Resource_Role string = "*"
 
@@ -1801,25 +2261,40 @@ func (m *Resource) GetRevocable() *Resource_RevocableInfo {
 }
 
 type Resource_ReservationInfo struct {
-	// This field indicates the principal of the operator or framework
-	// that reserved this resource. It is used in conjunction with the
-	// "unreserve" ACL to determine whether the entity attempting to
-	// unreserve this resource is permitted to do so.
-	// NOTE: This field should match the FrameworkInfo.principal of
-	// the framework that reserved this resource.
-	Principal        *string `protobuf:"bytes,1,req,name=principal" json:"principal,omitempty"`
+	// Indicates the principal, if any, of the framework or operator
+	// that reserved this resource. If reserved by a framework, the
+	// field should match the `FrameworkInfo.principal`. It is used in
+	// conjunction with the `UnreserveResources` ACL to determine
+	// whether the entity attempting to unreserve this resource is
+	// permitted to do so.
+	Principal *string `protobuf:"bytes,1,opt,name=principal" json:"principal,omitempty"`
+	// Labels are free-form key value pairs that can be used to
+	// associate arbitrary metadata with a reserved resource.  For
+	// example, frameworks can use labels to identify the intended
+	// purpose for a portion of the resources the framework has
+	// reserved at a given agent. Labels should not contain duplicate
+	// key-value pairs.
+	Labels           *Labels `protobuf:"bytes,2,opt,name=labels" json:"labels,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Resource_ReservationInfo) Reset()         { *m = Resource_ReservationInfo{} }
-func (m *Resource_ReservationInfo) String() string { return proto.CompactTextString(m) }
-func (*Resource_ReservationInfo) ProtoMessage()    {}
+func (m *Resource_ReservationInfo) Reset()                    { *m = Resource_ReservationInfo{} }
+func (m *Resource_ReservationInfo) String() string            { return proto.CompactTextString(m) }
+func (*Resource_ReservationInfo) ProtoMessage()               {}
+func (*Resource_ReservationInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{22, 0} }
 
 func (m *Resource_ReservationInfo) GetPrincipal() string {
 	if m != nil && m.Principal != nil {
 		return *m.Principal
 	}
 	return ""
+}
+
+func (m *Resource_ReservationInfo) GetLabels() *Labels {
+	if m != nil {
+		return m.Labels
+	}
+	return nil
 }
 
 type Resource_DiskInfo struct {
@@ -1833,13 +2308,15 @@ type Resource_DiskInfo struct {
 	// volume will be automatically garbage collected after
 	// task/executor terminates. Currently, if 'persistence' is set,
 	// 'volume' must be set.
-	Volume           *Volume `protobuf:"bytes,2,opt,name=volume" json:"volume,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
+	Volume           *Volume                   `protobuf:"bytes,2,opt,name=volume" json:"volume,omitempty"`
+	Source           *Resource_DiskInfo_Source `protobuf:"bytes,3,opt,name=source" json:"source,omitempty"`
+	XXX_unrecognized []byte                    `json:"-"`
 }
 
-func (m *Resource_DiskInfo) Reset()         { *m = Resource_DiskInfo{} }
-func (m *Resource_DiskInfo) String() string { return proto.CompactTextString(m) }
-func (*Resource_DiskInfo) ProtoMessage()    {}
+func (m *Resource_DiskInfo) Reset()                    { *m = Resource_DiskInfo{} }
+func (m *Resource_DiskInfo) String() string            { return proto.CompactTextString(m) }
+func (*Resource_DiskInfo) ProtoMessage()               {}
+func (*Resource_DiskInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{22, 1} }
 
 func (m *Resource_DiskInfo) GetPersistence() *Resource_DiskInfo_Persistence {
 	if m != nil {
@@ -1855,27 +2332,50 @@ func (m *Resource_DiskInfo) GetVolume() *Volume {
 	return nil
 }
 
+func (m *Resource_DiskInfo) GetSource() *Resource_DiskInfo_Source {
+	if m != nil {
+		return m.Source
+	}
+	return nil
+}
+
 // Describes a persistent disk volume.
+//
 // A persistent disk volume will not be automatically garbage
-// collected if the task/executor/agent terminates, but is
+// collected if the task/executor/agent terminates, but will be
 // re-offered to the framework(s) belonging to the 'role'.
-// A framework can set the ID (if it is not set yet) to express
-// the intention to create a new persistent disk volume from a
-// regular disk resource. To reuse a previously created volume, a
-// framework can launch a task/executor when it receives an offer
-// with a persistent volume, i.e., ID is set.
-// NOTE: Currently, we do not allow a persistent disk volume
-// without a reservation (i.e., 'role' should not be '*').
+//
+// NOTE: Currently, we do not allow persistent disk volumes
+// without a reservation (i.e., 'role' cannot be '*').
 type Resource_DiskInfo_Persistence struct {
-	// A unique ID for the persistent disk volume.
-	// NOTE: The ID needs to be unique per role on each agent.
-	Id               *string `protobuf:"bytes,1,req,name=id" json:"id,omitempty"`
+	// A unique ID for the persistent disk volume. This ID must be
+	// unique per role on each agent. Although it is possible to use
+	// the same ID on different agents in the cluster and to reuse
+	// IDs after a volume with that ID has been destroyed, both
+	// practices are discouraged.
+	Id *string `protobuf:"bytes,1,req,name=id" json:"id,omitempty"`
+	// This field indicates the principal of the operator or
+	// framework that created this volume. It is used in conjunction
+	// with the "destroy" ACL to determine whether an entity
+	// attempting to destroy the volume is permitted to do so.
+	//
+	// NOTE: This field is optional, while the `principal` found in
+	// `ReservationInfo` is required. This field is optional to
+	// allow for the possibility of volume creation without a
+	// principal, though currently it must be provided.
+	//
+	// NOTE: This field should match the FrameworkInfo.principal of
+	// the framework that created the volume.
+	Principal        *string `protobuf:"bytes,2,opt,name=principal" json:"principal,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *Resource_DiskInfo_Persistence) Reset()         { *m = Resource_DiskInfo_Persistence{} }
 func (m *Resource_DiskInfo_Persistence) String() string { return proto.CompactTextString(m) }
 func (*Resource_DiskInfo_Persistence) ProtoMessage()    {}
+func (*Resource_DiskInfo_Persistence) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{22, 1, 0}
+}
 
 func (m *Resource_DiskInfo_Persistence) GetId() string {
 	if m != nil && m.Id != nil {
@@ -1884,13 +2384,101 @@ func (m *Resource_DiskInfo_Persistence) GetId() string {
 	return ""
 }
 
+func (m *Resource_DiskInfo_Persistence) GetPrincipal() string {
+	if m != nil && m.Principal != nil {
+		return *m.Principal
+	}
+	return ""
+}
+
+// Describes where a disk originates from.
+// TODO(jmlvanre): Add support for BLOCK devices.
+type Resource_DiskInfo_Source struct {
+	Type             *Resource_DiskInfo_Source_Type  `protobuf:"varint,1,req,name=type,enum=mesos.v1.Resource_DiskInfo_Source_Type" json:"type,omitempty"`
+	Path             *Resource_DiskInfo_Source_Path  `protobuf:"bytes,2,opt,name=path" json:"path,omitempty"`
+	Mount            *Resource_DiskInfo_Source_Mount `protobuf:"bytes,3,opt,name=mount" json:"mount,omitempty"`
+	XXX_unrecognized []byte                          `json:"-"`
+}
+
+func (m *Resource_DiskInfo_Source) Reset()                    { *m = Resource_DiskInfo_Source{} }
+func (m *Resource_DiskInfo_Source) String() string            { return proto.CompactTextString(m) }
+func (*Resource_DiskInfo_Source) ProtoMessage()               {}
+func (*Resource_DiskInfo_Source) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{22, 1, 1} }
+
+func (m *Resource_DiskInfo_Source) GetType() Resource_DiskInfo_Source_Type {
+	if m != nil && m.Type != nil {
+		return *m.Type
+	}
+	return Resource_DiskInfo_Source_PATH
+}
+
+func (m *Resource_DiskInfo_Source) GetPath() *Resource_DiskInfo_Source_Path {
+	if m != nil {
+		return m.Path
+	}
+	return nil
+}
+
+func (m *Resource_DiskInfo_Source) GetMount() *Resource_DiskInfo_Source_Mount {
+	if m != nil {
+		return m.Mount
+	}
+	return nil
+}
+
+// A folder that can be located on a separate disk device. This
+// can be shared and carved up as necessary between frameworks.
+type Resource_DiskInfo_Source_Path struct {
+	// Path to the folder (e.g., /mnt/raid/disk0).
+	Root             *string `protobuf:"bytes,1,req,name=root" json:"root,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *Resource_DiskInfo_Source_Path) Reset()         { *m = Resource_DiskInfo_Source_Path{} }
+func (m *Resource_DiskInfo_Source_Path) String() string { return proto.CompactTextString(m) }
+func (*Resource_DiskInfo_Source_Path) ProtoMessage()    {}
+func (*Resource_DiskInfo_Source_Path) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{22, 1, 1, 0}
+}
+
+func (m *Resource_DiskInfo_Source_Path) GetRoot() string {
+	if m != nil && m.Root != nil {
+		return *m.Root
+	}
+	return ""
+}
+
+// A mounted file-system set up by the Agent administrator. This
+// can only be used exclusively: a framework can not accept a
+// partial amount of this disk.
+type Resource_DiskInfo_Source_Mount struct {
+	// Path to mount point (e.g., /mnt/raid/disk0).
+	Root             *string `protobuf:"bytes,1,req,name=root" json:"root,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *Resource_DiskInfo_Source_Mount) Reset()         { *m = Resource_DiskInfo_Source_Mount{} }
+func (m *Resource_DiskInfo_Source_Mount) String() string { return proto.CompactTextString(m) }
+func (*Resource_DiskInfo_Source_Mount) ProtoMessage()    {}
+func (*Resource_DiskInfo_Source_Mount) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{22, 1, 1, 1}
+}
+
+func (m *Resource_DiskInfo_Source_Mount) GetRoot() string {
+	if m != nil && m.Root != nil {
+		return *m.Root
+	}
+	return ""
+}
+
 type Resource_RevocableInfo struct {
 	XXX_unrecognized []byte `json:"-"`
 }
 
-func (m *Resource_RevocableInfo) Reset()         { *m = Resource_RevocableInfo{} }
-func (m *Resource_RevocableInfo) String() string { return proto.CompactTextString(m) }
-func (*Resource_RevocableInfo) ProtoMessage()    {}
+func (m *Resource_RevocableInfo) Reset()                    { *m = Resource_RevocableInfo{} }
+func (m *Resource_RevocableInfo) String() string            { return proto.CompactTextString(m) }
+func (*Resource_RevocableInfo) ProtoMessage()               {}
+func (*Resource_RevocableInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{22, 2} }
 
 // *
 // When the network bandwidth caps are enabled and the container
@@ -1930,9 +2518,10 @@ type TrafficControlStatistics struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *TrafficControlStatistics) Reset()         { *m = TrafficControlStatistics{} }
-func (m *TrafficControlStatistics) String() string { return proto.CompactTextString(m) }
-func (*TrafficControlStatistics) ProtoMessage()    {}
+func (m *TrafficControlStatistics) Reset()                    { *m = TrafficControlStatistics{} }
+func (m *TrafficControlStatistics) String() string            { return proto.CompactTextString(m) }
+func (*TrafficControlStatistics) ProtoMessage()               {}
+func (*TrafficControlStatistics) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{23} }
 
 func (m *TrafficControlStatistics) GetId() string {
 	if m != nil && m.Id != nil {
@@ -2004,6 +2593,635 @@ func (m *TrafficControlStatistics) GetRequeues() uint64 {
 	return 0
 }
 
+type IpStatistics struct {
+	Forwarding       *int64 `protobuf:"varint,1,opt,name=Forwarding" json:"Forwarding,omitempty"`
+	DefaultTTL       *int64 `protobuf:"varint,2,opt,name=DefaultTTL" json:"DefaultTTL,omitempty"`
+	InReceives       *int64 `protobuf:"varint,3,opt,name=InReceives" json:"InReceives,omitempty"`
+	InHdrErrors      *int64 `protobuf:"varint,4,opt,name=InHdrErrors" json:"InHdrErrors,omitempty"`
+	InAddrErrors     *int64 `protobuf:"varint,5,opt,name=InAddrErrors" json:"InAddrErrors,omitempty"`
+	ForwDatagrams    *int64 `protobuf:"varint,6,opt,name=ForwDatagrams" json:"ForwDatagrams,omitempty"`
+	InUnknownProtos  *int64 `protobuf:"varint,7,opt,name=InUnknownProtos" json:"InUnknownProtos,omitempty"`
+	InDiscards       *int64 `protobuf:"varint,8,opt,name=InDiscards" json:"InDiscards,omitempty"`
+	InDelivers       *int64 `protobuf:"varint,9,opt,name=InDelivers" json:"InDelivers,omitempty"`
+	OutRequests      *int64 `protobuf:"varint,10,opt,name=OutRequests" json:"OutRequests,omitempty"`
+	OutDiscards      *int64 `protobuf:"varint,11,opt,name=OutDiscards" json:"OutDiscards,omitempty"`
+	OutNoRoutes      *int64 `protobuf:"varint,12,opt,name=OutNoRoutes" json:"OutNoRoutes,omitempty"`
+	ReasmTimeout     *int64 `protobuf:"varint,13,opt,name=ReasmTimeout" json:"ReasmTimeout,omitempty"`
+	ReasmReqds       *int64 `protobuf:"varint,14,opt,name=ReasmReqds" json:"ReasmReqds,omitempty"`
+	ReasmOKs         *int64 `protobuf:"varint,15,opt,name=ReasmOKs" json:"ReasmOKs,omitempty"`
+	ReasmFails       *int64 `protobuf:"varint,16,opt,name=ReasmFails" json:"ReasmFails,omitempty"`
+	FragOKs          *int64 `protobuf:"varint,17,opt,name=FragOKs" json:"FragOKs,omitempty"`
+	FragFails        *int64 `protobuf:"varint,18,opt,name=FragFails" json:"FragFails,omitempty"`
+	FragCreates      *int64 `protobuf:"varint,19,opt,name=FragCreates" json:"FragCreates,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *IpStatistics) Reset()                    { *m = IpStatistics{} }
+func (m *IpStatistics) String() string            { return proto.CompactTextString(m) }
+func (*IpStatistics) ProtoMessage()               {}
+func (*IpStatistics) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{24} }
+
+func (m *IpStatistics) GetForwarding() int64 {
+	if m != nil && m.Forwarding != nil {
+		return *m.Forwarding
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetDefaultTTL() int64 {
+	if m != nil && m.DefaultTTL != nil {
+		return *m.DefaultTTL
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetInReceives() int64 {
+	if m != nil && m.InReceives != nil {
+		return *m.InReceives
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetInHdrErrors() int64 {
+	if m != nil && m.InHdrErrors != nil {
+		return *m.InHdrErrors
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetInAddrErrors() int64 {
+	if m != nil && m.InAddrErrors != nil {
+		return *m.InAddrErrors
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetForwDatagrams() int64 {
+	if m != nil && m.ForwDatagrams != nil {
+		return *m.ForwDatagrams
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetInUnknownProtos() int64 {
+	if m != nil && m.InUnknownProtos != nil {
+		return *m.InUnknownProtos
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetInDiscards() int64 {
+	if m != nil && m.InDiscards != nil {
+		return *m.InDiscards
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetInDelivers() int64 {
+	if m != nil && m.InDelivers != nil {
+		return *m.InDelivers
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetOutRequests() int64 {
+	if m != nil && m.OutRequests != nil {
+		return *m.OutRequests
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetOutDiscards() int64 {
+	if m != nil && m.OutDiscards != nil {
+		return *m.OutDiscards
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetOutNoRoutes() int64 {
+	if m != nil && m.OutNoRoutes != nil {
+		return *m.OutNoRoutes
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetReasmTimeout() int64 {
+	if m != nil && m.ReasmTimeout != nil {
+		return *m.ReasmTimeout
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetReasmReqds() int64 {
+	if m != nil && m.ReasmReqds != nil {
+		return *m.ReasmReqds
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetReasmOKs() int64 {
+	if m != nil && m.ReasmOKs != nil {
+		return *m.ReasmOKs
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetReasmFails() int64 {
+	if m != nil && m.ReasmFails != nil {
+		return *m.ReasmFails
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetFragOKs() int64 {
+	if m != nil && m.FragOKs != nil {
+		return *m.FragOKs
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetFragFails() int64 {
+	if m != nil && m.FragFails != nil {
+		return *m.FragFails
+	}
+	return 0
+}
+
+func (m *IpStatistics) GetFragCreates() int64 {
+	if m != nil && m.FragCreates != nil {
+		return *m.FragCreates
+	}
+	return 0
+}
+
+type IcmpStatistics struct {
+	InMsgs           *int64 `protobuf:"varint,1,opt,name=InMsgs" json:"InMsgs,omitempty"`
+	InErrors         *int64 `protobuf:"varint,2,opt,name=InErrors" json:"InErrors,omitempty"`
+	InCsumErrors     *int64 `protobuf:"varint,3,opt,name=InCsumErrors" json:"InCsumErrors,omitempty"`
+	InDestUnreachs   *int64 `protobuf:"varint,4,opt,name=InDestUnreachs" json:"InDestUnreachs,omitempty"`
+	InTimeExcds      *int64 `protobuf:"varint,5,opt,name=InTimeExcds" json:"InTimeExcds,omitempty"`
+	InParmProbs      *int64 `protobuf:"varint,6,opt,name=InParmProbs" json:"InParmProbs,omitempty"`
+	InSrcQuenchs     *int64 `protobuf:"varint,7,opt,name=InSrcQuenchs" json:"InSrcQuenchs,omitempty"`
+	InRedirects      *int64 `protobuf:"varint,8,opt,name=InRedirects" json:"InRedirects,omitempty"`
+	InEchos          *int64 `protobuf:"varint,9,opt,name=InEchos" json:"InEchos,omitempty"`
+	InEchoReps       *int64 `protobuf:"varint,10,opt,name=InEchoReps" json:"InEchoReps,omitempty"`
+	InTimestamps     *int64 `protobuf:"varint,11,opt,name=InTimestamps" json:"InTimestamps,omitempty"`
+	InTimestampReps  *int64 `protobuf:"varint,12,opt,name=InTimestampReps" json:"InTimestampReps,omitempty"`
+	InAddrMasks      *int64 `protobuf:"varint,13,opt,name=InAddrMasks" json:"InAddrMasks,omitempty"`
+	InAddrMaskReps   *int64 `protobuf:"varint,14,opt,name=InAddrMaskReps" json:"InAddrMaskReps,omitempty"`
+	OutMsgs          *int64 `protobuf:"varint,15,opt,name=OutMsgs" json:"OutMsgs,omitempty"`
+	OutErrors        *int64 `protobuf:"varint,16,opt,name=OutErrors" json:"OutErrors,omitempty"`
+	OutDestUnreachs  *int64 `protobuf:"varint,17,opt,name=OutDestUnreachs" json:"OutDestUnreachs,omitempty"`
+	OutTimeExcds     *int64 `protobuf:"varint,18,opt,name=OutTimeExcds" json:"OutTimeExcds,omitempty"`
+	OutParmProbs     *int64 `protobuf:"varint,19,opt,name=OutParmProbs" json:"OutParmProbs,omitempty"`
+	OutSrcQuenchs    *int64 `protobuf:"varint,20,opt,name=OutSrcQuenchs" json:"OutSrcQuenchs,omitempty"`
+	OutRedirects     *int64 `protobuf:"varint,21,opt,name=OutRedirects" json:"OutRedirects,omitempty"`
+	OutEchos         *int64 `protobuf:"varint,22,opt,name=OutEchos" json:"OutEchos,omitempty"`
+	OutEchoReps      *int64 `protobuf:"varint,23,opt,name=OutEchoReps" json:"OutEchoReps,omitempty"`
+	OutTimestamps    *int64 `protobuf:"varint,24,opt,name=OutTimestamps" json:"OutTimestamps,omitempty"`
+	OutTimestampReps *int64 `protobuf:"varint,25,opt,name=OutTimestampReps" json:"OutTimestampReps,omitempty"`
+	OutAddrMasks     *int64 `protobuf:"varint,26,opt,name=OutAddrMasks" json:"OutAddrMasks,omitempty"`
+	OutAddrMaskReps  *int64 `protobuf:"varint,27,opt,name=OutAddrMaskReps" json:"OutAddrMaskReps,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *IcmpStatistics) Reset()                    { *m = IcmpStatistics{} }
+func (m *IcmpStatistics) String() string            { return proto.CompactTextString(m) }
+func (*IcmpStatistics) ProtoMessage()               {}
+func (*IcmpStatistics) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{25} }
+
+func (m *IcmpStatistics) GetInMsgs() int64 {
+	if m != nil && m.InMsgs != nil {
+		return *m.InMsgs
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetInErrors() int64 {
+	if m != nil && m.InErrors != nil {
+		return *m.InErrors
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetInCsumErrors() int64 {
+	if m != nil && m.InCsumErrors != nil {
+		return *m.InCsumErrors
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetInDestUnreachs() int64 {
+	if m != nil && m.InDestUnreachs != nil {
+		return *m.InDestUnreachs
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetInTimeExcds() int64 {
+	if m != nil && m.InTimeExcds != nil {
+		return *m.InTimeExcds
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetInParmProbs() int64 {
+	if m != nil && m.InParmProbs != nil {
+		return *m.InParmProbs
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetInSrcQuenchs() int64 {
+	if m != nil && m.InSrcQuenchs != nil {
+		return *m.InSrcQuenchs
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetInRedirects() int64 {
+	if m != nil && m.InRedirects != nil {
+		return *m.InRedirects
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetInEchos() int64 {
+	if m != nil && m.InEchos != nil {
+		return *m.InEchos
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetInEchoReps() int64 {
+	if m != nil && m.InEchoReps != nil {
+		return *m.InEchoReps
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetInTimestamps() int64 {
+	if m != nil && m.InTimestamps != nil {
+		return *m.InTimestamps
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetInTimestampReps() int64 {
+	if m != nil && m.InTimestampReps != nil {
+		return *m.InTimestampReps
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetInAddrMasks() int64 {
+	if m != nil && m.InAddrMasks != nil {
+		return *m.InAddrMasks
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetInAddrMaskReps() int64 {
+	if m != nil && m.InAddrMaskReps != nil {
+		return *m.InAddrMaskReps
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetOutMsgs() int64 {
+	if m != nil && m.OutMsgs != nil {
+		return *m.OutMsgs
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetOutErrors() int64 {
+	if m != nil && m.OutErrors != nil {
+		return *m.OutErrors
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetOutDestUnreachs() int64 {
+	if m != nil && m.OutDestUnreachs != nil {
+		return *m.OutDestUnreachs
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetOutTimeExcds() int64 {
+	if m != nil && m.OutTimeExcds != nil {
+		return *m.OutTimeExcds
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetOutParmProbs() int64 {
+	if m != nil && m.OutParmProbs != nil {
+		return *m.OutParmProbs
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetOutSrcQuenchs() int64 {
+	if m != nil && m.OutSrcQuenchs != nil {
+		return *m.OutSrcQuenchs
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetOutRedirects() int64 {
+	if m != nil && m.OutRedirects != nil {
+		return *m.OutRedirects
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetOutEchos() int64 {
+	if m != nil && m.OutEchos != nil {
+		return *m.OutEchos
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetOutEchoReps() int64 {
+	if m != nil && m.OutEchoReps != nil {
+		return *m.OutEchoReps
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetOutTimestamps() int64 {
+	if m != nil && m.OutTimestamps != nil {
+		return *m.OutTimestamps
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetOutTimestampReps() int64 {
+	if m != nil && m.OutTimestampReps != nil {
+		return *m.OutTimestampReps
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetOutAddrMasks() int64 {
+	if m != nil && m.OutAddrMasks != nil {
+		return *m.OutAddrMasks
+	}
+	return 0
+}
+
+func (m *IcmpStatistics) GetOutAddrMaskReps() int64 {
+	if m != nil && m.OutAddrMaskReps != nil {
+		return *m.OutAddrMaskReps
+	}
+	return 0
+}
+
+type TcpStatistics struct {
+	RtoAlgorithm     *int64 `protobuf:"varint,1,opt,name=RtoAlgorithm" json:"RtoAlgorithm,omitempty"`
+	RtoMin           *int64 `protobuf:"varint,2,opt,name=RtoMin" json:"RtoMin,omitempty"`
+	RtoMax           *int64 `protobuf:"varint,3,opt,name=RtoMax" json:"RtoMax,omitempty"`
+	MaxConn          *int64 `protobuf:"varint,4,opt,name=MaxConn" json:"MaxConn,omitempty"`
+	ActiveOpens      *int64 `protobuf:"varint,5,opt,name=ActiveOpens" json:"ActiveOpens,omitempty"`
+	PassiveOpens     *int64 `protobuf:"varint,6,opt,name=PassiveOpens" json:"PassiveOpens,omitempty"`
+	AttemptFails     *int64 `protobuf:"varint,7,opt,name=AttemptFails" json:"AttemptFails,omitempty"`
+	EstabResets      *int64 `protobuf:"varint,8,opt,name=EstabResets" json:"EstabResets,omitempty"`
+	CurrEstab        *int64 `protobuf:"varint,9,opt,name=CurrEstab" json:"CurrEstab,omitempty"`
+	InSegs           *int64 `protobuf:"varint,10,opt,name=InSegs" json:"InSegs,omitempty"`
+	OutSegs          *int64 `protobuf:"varint,11,opt,name=OutSegs" json:"OutSegs,omitempty"`
+	RetransSegs      *int64 `protobuf:"varint,12,opt,name=RetransSegs" json:"RetransSegs,omitempty"`
+	InErrs           *int64 `protobuf:"varint,13,opt,name=InErrs" json:"InErrs,omitempty"`
+	OutRsts          *int64 `protobuf:"varint,14,opt,name=OutRsts" json:"OutRsts,omitempty"`
+	InCsumErrors     *int64 `protobuf:"varint,15,opt,name=InCsumErrors" json:"InCsumErrors,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *TcpStatistics) Reset()                    { *m = TcpStatistics{} }
+func (m *TcpStatistics) String() string            { return proto.CompactTextString(m) }
+func (*TcpStatistics) ProtoMessage()               {}
+func (*TcpStatistics) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{26} }
+
+func (m *TcpStatistics) GetRtoAlgorithm() int64 {
+	if m != nil && m.RtoAlgorithm != nil {
+		return *m.RtoAlgorithm
+	}
+	return 0
+}
+
+func (m *TcpStatistics) GetRtoMin() int64 {
+	if m != nil && m.RtoMin != nil {
+		return *m.RtoMin
+	}
+	return 0
+}
+
+func (m *TcpStatistics) GetRtoMax() int64 {
+	if m != nil && m.RtoMax != nil {
+		return *m.RtoMax
+	}
+	return 0
+}
+
+func (m *TcpStatistics) GetMaxConn() int64 {
+	if m != nil && m.MaxConn != nil {
+		return *m.MaxConn
+	}
+	return 0
+}
+
+func (m *TcpStatistics) GetActiveOpens() int64 {
+	if m != nil && m.ActiveOpens != nil {
+		return *m.ActiveOpens
+	}
+	return 0
+}
+
+func (m *TcpStatistics) GetPassiveOpens() int64 {
+	if m != nil && m.PassiveOpens != nil {
+		return *m.PassiveOpens
+	}
+	return 0
+}
+
+func (m *TcpStatistics) GetAttemptFails() int64 {
+	if m != nil && m.AttemptFails != nil {
+		return *m.AttemptFails
+	}
+	return 0
+}
+
+func (m *TcpStatistics) GetEstabResets() int64 {
+	if m != nil && m.EstabResets != nil {
+		return *m.EstabResets
+	}
+	return 0
+}
+
+func (m *TcpStatistics) GetCurrEstab() int64 {
+	if m != nil && m.CurrEstab != nil {
+		return *m.CurrEstab
+	}
+	return 0
+}
+
+func (m *TcpStatistics) GetInSegs() int64 {
+	if m != nil && m.InSegs != nil {
+		return *m.InSegs
+	}
+	return 0
+}
+
+func (m *TcpStatistics) GetOutSegs() int64 {
+	if m != nil && m.OutSegs != nil {
+		return *m.OutSegs
+	}
+	return 0
+}
+
+func (m *TcpStatistics) GetRetransSegs() int64 {
+	if m != nil && m.RetransSegs != nil {
+		return *m.RetransSegs
+	}
+	return 0
+}
+
+func (m *TcpStatistics) GetInErrs() int64 {
+	if m != nil && m.InErrs != nil {
+		return *m.InErrs
+	}
+	return 0
+}
+
+func (m *TcpStatistics) GetOutRsts() int64 {
+	if m != nil && m.OutRsts != nil {
+		return *m.OutRsts
+	}
+	return 0
+}
+
+func (m *TcpStatistics) GetInCsumErrors() int64 {
+	if m != nil && m.InCsumErrors != nil {
+		return *m.InCsumErrors
+	}
+	return 0
+}
+
+type UdpStatistics struct {
+	InDatagrams      *int64 `protobuf:"varint,1,opt,name=InDatagrams" json:"InDatagrams,omitempty"`
+	NoPorts          *int64 `protobuf:"varint,2,opt,name=NoPorts" json:"NoPorts,omitempty"`
+	InErrors         *int64 `protobuf:"varint,3,opt,name=InErrors" json:"InErrors,omitempty"`
+	OutDatagrams     *int64 `protobuf:"varint,4,opt,name=OutDatagrams" json:"OutDatagrams,omitempty"`
+	RcvbufErrors     *int64 `protobuf:"varint,5,opt,name=RcvbufErrors" json:"RcvbufErrors,omitempty"`
+	SndbufErrors     *int64 `protobuf:"varint,6,opt,name=SndbufErrors" json:"SndbufErrors,omitempty"`
+	InCsumErrors     *int64 `protobuf:"varint,7,opt,name=InCsumErrors" json:"InCsumErrors,omitempty"`
+	IgnoredMulti     *int64 `protobuf:"varint,8,opt,name=IgnoredMulti" json:"IgnoredMulti,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *UdpStatistics) Reset()                    { *m = UdpStatistics{} }
+func (m *UdpStatistics) String() string            { return proto.CompactTextString(m) }
+func (*UdpStatistics) ProtoMessage()               {}
+func (*UdpStatistics) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{27} }
+
+func (m *UdpStatistics) GetInDatagrams() int64 {
+	if m != nil && m.InDatagrams != nil {
+		return *m.InDatagrams
+	}
+	return 0
+}
+
+func (m *UdpStatistics) GetNoPorts() int64 {
+	if m != nil && m.NoPorts != nil {
+		return *m.NoPorts
+	}
+	return 0
+}
+
+func (m *UdpStatistics) GetInErrors() int64 {
+	if m != nil && m.InErrors != nil {
+		return *m.InErrors
+	}
+	return 0
+}
+
+func (m *UdpStatistics) GetOutDatagrams() int64 {
+	if m != nil && m.OutDatagrams != nil {
+		return *m.OutDatagrams
+	}
+	return 0
+}
+
+func (m *UdpStatistics) GetRcvbufErrors() int64 {
+	if m != nil && m.RcvbufErrors != nil {
+		return *m.RcvbufErrors
+	}
+	return 0
+}
+
+func (m *UdpStatistics) GetSndbufErrors() int64 {
+	if m != nil && m.SndbufErrors != nil {
+		return *m.SndbufErrors
+	}
+	return 0
+}
+
+func (m *UdpStatistics) GetInCsumErrors() int64 {
+	if m != nil && m.InCsumErrors != nil {
+		return *m.InCsumErrors
+	}
+	return 0
+}
+
+func (m *UdpStatistics) GetIgnoredMulti() int64 {
+	if m != nil && m.IgnoredMulti != nil {
+		return *m.IgnoredMulti
+	}
+	return 0
+}
+
+type SNMPStatistics struct {
+	IpStats          *IpStatistics   `protobuf:"bytes,1,opt,name=ip_stats" json:"ip_stats,omitempty"`
+	IcmpStats        *IcmpStatistics `protobuf:"bytes,2,opt,name=icmp_stats" json:"icmp_stats,omitempty"`
+	TcpStats         *TcpStatistics  `protobuf:"bytes,3,opt,name=tcp_stats" json:"tcp_stats,omitempty"`
+	UdpStats         *UdpStatistics  `protobuf:"bytes,4,opt,name=udp_stats" json:"udp_stats,omitempty"`
+	XXX_unrecognized []byte          `json:"-"`
+}
+
+func (m *SNMPStatistics) Reset()                    { *m = SNMPStatistics{} }
+func (m *SNMPStatistics) String() string            { return proto.CompactTextString(m) }
+func (*SNMPStatistics) ProtoMessage()               {}
+func (*SNMPStatistics) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{28} }
+
+func (m *SNMPStatistics) GetIpStats() *IpStatistics {
+	if m != nil {
+		return m.IpStats
+	}
+	return nil
+}
+
+func (m *SNMPStatistics) GetIcmpStats() *IcmpStatistics {
+	if m != nil {
+		return m.IcmpStats
+	}
+	return nil
+}
+
+func (m *SNMPStatistics) GetTcpStats() *TcpStatistics {
+	if m != nil {
+		return m.TcpStats
+	}
+	return nil
+}
+
+func (m *SNMPStatistics) GetUdpStats() *UdpStatistics {
+	if m != nil {
+		return m.UdpStats
+	}
+	return nil
+}
+
 // *
 // A snapshot of resource usage statistics.
 type ResourceStatistics struct {
@@ -2044,7 +3262,8 @@ type ResourceStatistics struct {
 	MemRssBytes        *uint64 `protobuf:"varint,5,opt,name=mem_rss_bytes" json:"mem_rss_bytes,omitempty"`
 	MemMappedFileBytes *uint64 `protobuf:"varint,12,opt,name=mem_mapped_file_bytes" json:"mem_mapped_file_bytes,omitempty"`
 	// This is only set if swap is enabled.
-	MemSwapBytes *uint64 `protobuf:"varint,40,opt,name=mem_swap_bytes" json:"mem_swap_bytes,omitempty"`
+	MemSwapBytes        *uint64 `protobuf:"varint,40,opt,name=mem_swap_bytes" json:"mem_swap_bytes,omitempty"`
+	MemUnevictableBytes *uint64 `protobuf:"varint,41,opt,name=mem_unevictable_bytes" json:"mem_unevictable_bytes,omitempty"`
 	// Number of occurrences of different levels of memory pressure
 	// events reported by memory cgroup. Pressure listening (re)starts
 	// with these values set to 0 when agent (re)starts. See
@@ -2079,12 +3298,15 @@ type ResourceStatistics struct {
 	// or dropped due to congestion or policy inside and outside the
 	// container.
 	NetTrafficControlStatistics []*TrafficControlStatistics `protobuf:"bytes,35,rep,name=net_traffic_control_statistics" json:"net_traffic_control_statistics,omitempty"`
-	XXX_unrecognized            []byte                      `json:"-"`
+	// Network SNMP statistics for each container.
+	NetSnmpStatistics *SNMPStatistics `protobuf:"bytes,42,opt,name=net_snmp_statistics" json:"net_snmp_statistics,omitempty"`
+	XXX_unrecognized  []byte          `json:"-"`
 }
 
-func (m *ResourceStatistics) Reset()         { *m = ResourceStatistics{} }
-func (m *ResourceStatistics) String() string { return proto.CompactTextString(m) }
-func (*ResourceStatistics) ProtoMessage()    {}
+func (m *ResourceStatistics) Reset()                    { *m = ResourceStatistics{} }
+func (m *ResourceStatistics) String() string            { return proto.CompactTextString(m) }
+func (*ResourceStatistics) ProtoMessage()               {}
+func (*ResourceStatistics) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{29} }
 
 func (m *ResourceStatistics) GetTimestamp() float64 {
 	if m != nil && m.Timestamp != nil {
@@ -2215,6 +3437,13 @@ func (m *ResourceStatistics) GetMemMappedFileBytes() uint64 {
 func (m *ResourceStatistics) GetMemSwapBytes() uint64 {
 	if m != nil && m.MemSwapBytes != nil {
 		return *m.MemSwapBytes
+	}
+	return 0
+}
+
+func (m *ResourceStatistics) GetMemUnevictableBytes() uint64 {
+	if m != nil && m.MemUnevictableBytes != nil {
+		return *m.MemUnevictableBytes
 	}
 	return 0
 }
@@ -2366,6 +3595,13 @@ func (m *ResourceStatistics) GetNetTrafficControlStatistics() []*TrafficControlS
 	return nil
 }
 
+func (m *ResourceStatistics) GetNetSnmpStatistics() *SNMPStatistics {
+	if m != nil {
+		return m.NetSnmpStatistics
+	}
+	return nil
+}
+
 // *
 // Describes a snapshot of the resource usage for executors.
 type ResourceUsage struct {
@@ -2376,9 +3612,10 @@ type ResourceUsage struct {
 	XXX_unrecognized []byte      `json:"-"`
 }
 
-func (m *ResourceUsage) Reset()         { *m = ResourceUsage{} }
-func (m *ResourceUsage) String() string { return proto.CompactTextString(m) }
-func (*ResourceUsage) ProtoMessage()    {}
+func (m *ResourceUsage) Reset()                    { *m = ResourceUsage{} }
+func (m *ResourceUsage) String() string            { return proto.CompactTextString(m) }
+func (*ResourceUsage) ProtoMessage()               {}
+func (*ResourceUsage) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{30} }
 
 func (m *ResourceUsage) GetExecutors() []*ResourceUsage_Executor {
 	if m != nil {
@@ -2401,13 +3638,18 @@ type ResourceUsage_Executor struct {
 	Allocated []*Resource `protobuf:"bytes,2,rep,name=allocated" json:"allocated,omitempty"`
 	// Current resource usage. If absent, the containerizer
 	// cannot provide resource usage.
-	Statistics       *ResourceStatistics `protobuf:"bytes,3,opt,name=statistics" json:"statistics,omitempty"`
-	XXX_unrecognized []byte              `json:"-"`
+	Statistics *ResourceStatistics `protobuf:"bytes,3,opt,name=statistics" json:"statistics,omitempty"`
+	// The container id for the executor specified in the executor_info field.
+	ContainerId *ContainerID `protobuf:"bytes,4,req,name=container_id" json:"container_id,omitempty"`
+	// Non-terminal tasks.
+	Tasks            []*ResourceUsage_Executor_Task `protobuf:"bytes,5,rep,name=tasks" json:"tasks,omitempty"`
+	XXX_unrecognized []byte                         `json:"-"`
 }
 
-func (m *ResourceUsage_Executor) Reset()         { *m = ResourceUsage_Executor{} }
-func (m *ResourceUsage_Executor) String() string { return proto.CompactTextString(m) }
-func (*ResourceUsage_Executor) ProtoMessage()    {}
+func (m *ResourceUsage_Executor) Reset()                    { *m = ResourceUsage_Executor{} }
+func (m *ResourceUsage_Executor) String() string            { return proto.CompactTextString(m) }
+func (*ResourceUsage_Executor) ProtoMessage()               {}
+func (*ResourceUsage_Executor) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{30, 0} }
 
 func (m *ResourceUsage_Executor) GetExecutorInfo() *ExecutorInfo {
 	if m != nil {
@@ -2426,6 +3668,63 @@ func (m *ResourceUsage_Executor) GetAllocated() []*Resource {
 func (m *ResourceUsage_Executor) GetStatistics() *ResourceStatistics {
 	if m != nil {
 		return m.Statistics
+	}
+	return nil
+}
+
+func (m *ResourceUsage_Executor) GetContainerId() *ContainerID {
+	if m != nil {
+		return m.ContainerId
+	}
+	return nil
+}
+
+func (m *ResourceUsage_Executor) GetTasks() []*ResourceUsage_Executor_Task {
+	if m != nil {
+		return m.Tasks
+	}
+	return nil
+}
+
+type ResourceUsage_Executor_Task struct {
+	Name             *string     `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Id               *TaskID     `protobuf:"bytes,2,req,name=id" json:"id,omitempty"`
+	Resources        []*Resource `protobuf:"bytes,3,rep,name=resources" json:"resources,omitempty"`
+	Labels           *Labels     `protobuf:"bytes,4,opt,name=labels" json:"labels,omitempty"`
+	XXX_unrecognized []byte      `json:"-"`
+}
+
+func (m *ResourceUsage_Executor_Task) Reset()         { *m = ResourceUsage_Executor_Task{} }
+func (m *ResourceUsage_Executor_Task) String() string { return proto.CompactTextString(m) }
+func (*ResourceUsage_Executor_Task) ProtoMessage()    {}
+func (*ResourceUsage_Executor_Task) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{30, 0, 0}
+}
+
+func (m *ResourceUsage_Executor_Task) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *ResourceUsage_Executor_Task) GetId() *TaskID {
+	if m != nil {
+		return m.Id
+	}
+	return nil
+}
+
+func (m *ResourceUsage_Executor_Task) GetResources() []*Resource {
+	if m != nil {
+		return m.Resources
+	}
+	return nil
+}
+
+func (m *ResourceUsage_Executor_Task) GetLabels() *Labels {
+	if m != nil {
+		return m.Labels
 	}
 	return nil
 }
@@ -2501,9 +3800,10 @@ type PerfStatistics struct {
 	XXX_unrecognized       []byte  `json:"-"`
 }
 
-func (m *PerfStatistics) Reset()         { *m = PerfStatistics{} }
-func (m *PerfStatistics) String() string { return proto.CompactTextString(m) }
-func (*PerfStatistics) ProtoMessage()    {}
+func (m *PerfStatistics) Reset()                    { *m = PerfStatistics{} }
+func (m *PerfStatistics) String() string            { return proto.CompactTextString(m) }
+func (*PerfStatistics) ProtoMessage()               {}
+func (*PerfStatistics) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{31} }
 
 func (m *PerfStatistics) GetTimestamp() float64 {
 	if m != nil && m.Timestamp != nil {
@@ -2887,9 +4187,10 @@ type Request struct {
 	XXX_unrecognized []byte      `json:"-"`
 }
 
-func (m *Request) Reset()         { *m = Request{} }
-func (m *Request) String() string { return proto.CompactTextString(m) }
-func (*Request) ProtoMessage()    {}
+func (m *Request) Reset()                    { *m = Request{} }
+func (m *Request) String() string            { return proto.CompactTextString(m) }
+func (*Request) ProtoMessage()               {}
+func (*Request) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{32} }
 
 func (m *Request) GetAgentId() *AgentID {
 	if m != nil {
@@ -2906,7 +4207,7 @@ func (m *Request) GetResources() []*Resource {
 }
 
 // *
-// Describes some resources available on a agent. An offer only
+// Describes some resources available on an agent. An offer only
 // contains resources from a single agent.
 type Offer struct {
 	Id          *OfferID     `protobuf:"bytes,1,req,name=id" json:"id,omitempty"`
@@ -2914,16 +4215,28 @@ type Offer struct {
 	AgentId     *AgentID     `protobuf:"bytes,3,req,name=agent_id" json:"agent_id,omitempty"`
 	Hostname    *string      `protobuf:"bytes,4,req,name=hostname" json:"hostname,omitempty"`
 	// URL for reaching the agent running on the host.
-	Url              *URL          `protobuf:"bytes,8,opt,name=url" json:"url,omitempty"`
-	Resources        []*Resource   `protobuf:"bytes,5,rep,name=resources" json:"resources,omitempty"`
-	Attributes       []*Attribute  `protobuf:"bytes,7,rep,name=attributes" json:"attributes,omitempty"`
-	ExecutorIds      []*ExecutorID `protobuf:"bytes,6,rep,name=executor_ids" json:"executor_ids,omitempty"`
-	XXX_unrecognized []byte        `json:"-"`
+	Url         *URL          `protobuf:"bytes,8,opt,name=url" json:"url,omitempty"`
+	Resources   []*Resource   `protobuf:"bytes,5,rep,name=resources" json:"resources,omitempty"`
+	Attributes  []*Attribute  `protobuf:"bytes,7,rep,name=attributes" json:"attributes,omitempty"`
+	ExecutorIds []*ExecutorID `protobuf:"bytes,6,rep,name=executor_ids" json:"executor_ids,omitempty"`
+	// Signifies that the resources in this Offer may be unavailable during
+	// the given interval.  Any tasks launched using these resources may be
+	// killed when the interval arrives.  For example, these resources may be
+	// part of a planned maintenance schedule.
+	//
+	// This field only provides information about a planned unavailability.
+	// The unavailability interval may not necessarily start at exactly this
+	// interval, nor last for exactly the duration of this interval.
+	// The unavailability may also be forever!  See comments in
+	// `Unavailability` for more details.
+	Unavailability   *Unavailability `protobuf:"bytes,9,opt,name=unavailability" json:"unavailability,omitempty"`
+	XXX_unrecognized []byte          `json:"-"`
 }
 
-func (m *Offer) Reset()         { *m = Offer{} }
-func (m *Offer) String() string { return proto.CompactTextString(m) }
-func (*Offer) ProtoMessage()    {}
+func (m *Offer) Reset()                    { *m = Offer{} }
+func (m *Offer) String() string            { return proto.CompactTextString(m) }
+func (*Offer) ProtoMessage()               {}
+func (*Offer) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{33} }
 
 func (m *Offer) GetId() *OfferID {
 	if m != nil {
@@ -2981,9 +4294,16 @@ func (m *Offer) GetExecutorIds() []*ExecutorID {
 	return nil
 }
 
+func (m *Offer) GetUnavailability() *Unavailability {
+	if m != nil {
+		return m.Unavailability
+	}
+	return nil
+}
+
 // Defines an operation that can be performed against offers.
 type Offer_Operation struct {
-	Type             *Offer_Operation_Type      `protobuf:"varint,1,req,name=type,enum=mesosproto.Offer_Operation_Type" json:"type,omitempty"`
+	Type             *Offer_Operation_Type      `protobuf:"varint,1,req,name=type,enum=mesos.v1.Offer_Operation_Type" json:"type,omitempty"`
 	Launch           *Offer_Operation_Launch    `protobuf:"bytes,2,opt,name=launch" json:"launch,omitempty"`
 	Reserve          *Offer_Operation_Reserve   `protobuf:"bytes,3,opt,name=reserve" json:"reserve,omitempty"`
 	Unreserve        *Offer_Operation_Unreserve `protobuf:"bytes,4,opt,name=unreserve" json:"unreserve,omitempty"`
@@ -2992,9 +4312,10 @@ type Offer_Operation struct {
 	XXX_unrecognized []byte                     `json:"-"`
 }
 
-func (m *Offer_Operation) Reset()         { *m = Offer_Operation{} }
-func (m *Offer_Operation) String() string { return proto.CompactTextString(m) }
-func (*Offer_Operation) ProtoMessage()    {}
+func (m *Offer_Operation) Reset()                    { *m = Offer_Operation{} }
+func (m *Offer_Operation) String() string            { return proto.CompactTextString(m) }
+func (*Offer_Operation) ProtoMessage()               {}
+func (*Offer_Operation) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{33, 0} }
 
 func (m *Offer_Operation) GetType() Offer_Operation_Type {
 	if m != nil && m.Type != nil {
@@ -3043,9 +4364,10 @@ type Offer_Operation_Launch struct {
 	XXX_unrecognized []byte      `json:"-"`
 }
 
-func (m *Offer_Operation_Launch) Reset()         { *m = Offer_Operation_Launch{} }
-func (m *Offer_Operation_Launch) String() string { return proto.CompactTextString(m) }
-func (*Offer_Operation_Launch) ProtoMessage()    {}
+func (m *Offer_Operation_Launch) Reset()                    { *m = Offer_Operation_Launch{} }
+func (m *Offer_Operation_Launch) String() string            { return proto.CompactTextString(m) }
+func (*Offer_Operation_Launch) ProtoMessage()               {}
+func (*Offer_Operation_Launch) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{33, 0, 0} }
 
 func (m *Offer_Operation_Launch) GetTaskInfos() []*TaskInfo {
 	if m != nil {
@@ -3059,9 +4381,10 @@ type Offer_Operation_Reserve struct {
 	XXX_unrecognized []byte      `json:"-"`
 }
 
-func (m *Offer_Operation_Reserve) Reset()         { *m = Offer_Operation_Reserve{} }
-func (m *Offer_Operation_Reserve) String() string { return proto.CompactTextString(m) }
-func (*Offer_Operation_Reserve) ProtoMessage()    {}
+func (m *Offer_Operation_Reserve) Reset()                    { *m = Offer_Operation_Reserve{} }
+func (m *Offer_Operation_Reserve) String() string            { return proto.CompactTextString(m) }
+func (*Offer_Operation_Reserve) ProtoMessage()               {}
+func (*Offer_Operation_Reserve) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{33, 0, 1} }
 
 func (m *Offer_Operation_Reserve) GetResources() []*Resource {
 	if m != nil {
@@ -3078,6 +4401,9 @@ type Offer_Operation_Unreserve struct {
 func (m *Offer_Operation_Unreserve) Reset()         { *m = Offer_Operation_Unreserve{} }
 func (m *Offer_Operation_Unreserve) String() string { return proto.CompactTextString(m) }
 func (*Offer_Operation_Unreserve) ProtoMessage()    {}
+func (*Offer_Operation_Unreserve) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{33, 0, 2}
+}
 
 func (m *Offer_Operation_Unreserve) GetResources() []*Resource {
 	if m != nil {
@@ -3091,9 +4417,10 @@ type Offer_Operation_Create struct {
 	XXX_unrecognized []byte      `json:"-"`
 }
 
-func (m *Offer_Operation_Create) Reset()         { *m = Offer_Operation_Create{} }
-func (m *Offer_Operation_Create) String() string { return proto.CompactTextString(m) }
-func (*Offer_Operation_Create) ProtoMessage()    {}
+func (m *Offer_Operation_Create) Reset()                    { *m = Offer_Operation_Create{} }
+func (m *Offer_Operation_Create) String() string            { return proto.CompactTextString(m) }
+func (*Offer_Operation_Create) ProtoMessage()               {}
+func (*Offer_Operation_Create) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{33, 0, 3} }
 
 func (m *Offer_Operation_Create) GetVolumes() []*Resource {
 	if m != nil {
@@ -3107,13 +4434,103 @@ type Offer_Operation_Destroy struct {
 	XXX_unrecognized []byte      `json:"-"`
 }
 
-func (m *Offer_Operation_Destroy) Reset()         { *m = Offer_Operation_Destroy{} }
-func (m *Offer_Operation_Destroy) String() string { return proto.CompactTextString(m) }
-func (*Offer_Operation_Destroy) ProtoMessage()    {}
+func (m *Offer_Operation_Destroy) Reset()                    { *m = Offer_Operation_Destroy{} }
+func (m *Offer_Operation_Destroy) String() string            { return proto.CompactTextString(m) }
+func (*Offer_Operation_Destroy) ProtoMessage()               {}
+func (*Offer_Operation_Destroy) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{33, 0, 4} }
 
 func (m *Offer_Operation_Destroy) GetVolumes() []*Resource {
 	if m != nil {
 		return m.Volumes
+	}
+	return nil
+}
+
+// *
+// A request to return some resources occupied by a framework.
+type InverseOffer struct {
+	// This is the same OfferID as found in normal offers, which allows
+	// re-use of some of the OfferID-only messages.
+	Id *OfferID `protobuf:"bytes,1,req,name=id" json:"id,omitempty"`
+	// URL for reaching the agent running on the host.  This enables some
+	// optimizations as described in MESOS-3012, such as allowing the
+	// scheduler driver to bypass the master and talk directly with an agent.
+	Url *URL `protobuf:"bytes,2,opt,name=url" json:"url,omitempty"`
+	// The framework that should release its resources.
+	// If no specifics are provided (i.e. which agent), all the framework's
+	// resources are requested back.
+	FrameworkId *FrameworkID `protobuf:"bytes,3,req,name=framework_id" json:"framework_id,omitempty"`
+	// Specified if the resources need to be released from a particular agent.
+	// All the framework's resources on this agent are requested back,
+	// unless further qualified by the `resources` field.
+	AgentId *AgentID `protobuf:"bytes,4,opt,name=agent_id" json:"agent_id,omitempty"`
+	// This InverseOffer represents a planned unavailability event in the
+	// specified interval.  Any tasks running on the given framework or agent
+	// may be killed when the interval arrives.  Therefore, frameworks should
+	// aim to gracefully terminate tasks prior to the arrival of the interval.
+	//
+	// For reserved resources, the resources are expected to be returned to the
+	// framework after the unavailability interval.  This is an expectation,
+	// not a guarantee.  For example, if the unavailability duration is not set,
+	// the resources may be removed permanently.
+	//
+	// For other resources, there is no guarantee that requested resources will
+	// be returned after the unavailability interval.  The allocator has no
+	// obligation to re-offer these resources to the prior framework after
+	// the unavailability.
+	Unavailability *Unavailability `protobuf:"bytes,5,req,name=unavailability" json:"unavailability,omitempty"`
+	// A list of resources being requested back from the framework,
+	// on the agent identified by `agent_id`.  If no resources are specified
+	// then all resources are being requested back.  For the purpose of
+	// maintenance, this field is always empty (maintenance always requests
+	// all resources back).
+	Resources        []*Resource `protobuf:"bytes,6,rep,name=resources" json:"resources,omitempty"`
+	XXX_unrecognized []byte      `json:"-"`
+}
+
+func (m *InverseOffer) Reset()                    { *m = InverseOffer{} }
+func (m *InverseOffer) String() string            { return proto.CompactTextString(m) }
+func (*InverseOffer) ProtoMessage()               {}
+func (*InverseOffer) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{34} }
+
+func (m *InverseOffer) GetId() *OfferID {
+	if m != nil {
+		return m.Id
+	}
+	return nil
+}
+
+func (m *InverseOffer) GetUrl() *URL {
+	if m != nil {
+		return m.Url
+	}
+	return nil
+}
+
+func (m *InverseOffer) GetFrameworkId() *FrameworkID {
+	if m != nil {
+		return m.FrameworkId
+	}
+	return nil
+}
+
+func (m *InverseOffer) GetAgentId() *AgentID {
+	if m != nil {
+		return m.AgentId
+	}
+	return nil
+}
+
+func (m *InverseOffer) GetUnavailability() *Unavailability {
+	if m != nil {
+		return m.Unavailability
+	}
+	return nil
+}
+
+func (m *InverseOffer) GetResources() []*Resource {
+	if m != nil {
+		return m.Resources
 	}
 	return nil
 }
@@ -3134,15 +4551,22 @@ type TaskInfo struct {
 	// Task provided with a container will launch the container as part
 	// of this task paired with the task's CommandInfo.
 	Container *ContainerInfo `protobuf:"bytes,9,opt,name=container" json:"container,omitempty"`
-	Data      []byte         `protobuf:"bytes,6,opt,name=data" json:"data,omitempty"`
-	// A health check for the task (currently in *alpha* and initial
-	// support will only be for TaskInfo's that have a CommandInfo).
+	// A health check for the task. Implemented for executor-less
+	// command-based tasks. For tasks that specify an executor, it is
+	// the executor's responsibility to implement the health checking.
 	HealthCheck *HealthCheck `protobuf:"bytes,8,opt,name=health_check" json:"health_check,omitempty"`
+	// A kill policy for the task. Implemented for executor-less
+	// command-based and docker tasks. For tasks that specify other
+	// executor, it is the executor's responsibility to implement
+	// the kill policy.
+	KillPolicy *KillPolicy `protobuf:"bytes,12,opt,name=kill_policy" json:"kill_policy,omitempty"`
+	Data       []byte      `protobuf:"bytes,6,opt,name=data" json:"data,omitempty"`
 	// Labels are free-form key value pairs which are exposed through
 	// master and agent endpoints. Labels will not be interpreted or
 	// acted upon by Mesos itself. As opposed to the data field, labels
 	// will be kept in memory on master and agent processes. Therefore,
 	// labels should be used to tag tasks with light-weight meta-data.
+	// Labels should not contain duplicate key-value pairs.
 	Labels *Labels `protobuf:"bytes,10,opt,name=labels" json:"labels,omitempty"`
 	// Service discovery information for the task. It is not interpreted
 	// or acted upon by Mesos. It is up to a service discovery system
@@ -3152,9 +4576,10 @@ type TaskInfo struct {
 	XXX_unrecognized []byte         `json:"-"`
 }
 
-func (m *TaskInfo) Reset()         { *m = TaskInfo{} }
-func (m *TaskInfo) String() string { return proto.CompactTextString(m) }
-func (*TaskInfo) ProtoMessage()    {}
+func (m *TaskInfo) Reset()                    { *m = TaskInfo{} }
+func (m *TaskInfo) String() string            { return proto.CompactTextString(m) }
+func (*TaskInfo) ProtoMessage()               {}
+func (*TaskInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{35} }
 
 func (m *TaskInfo) GetName() string {
 	if m != nil && m.Name != nil {
@@ -3205,16 +4630,23 @@ func (m *TaskInfo) GetContainer() *ContainerInfo {
 	return nil
 }
 
-func (m *TaskInfo) GetData() []byte {
+func (m *TaskInfo) GetHealthCheck() *HealthCheck {
 	if m != nil {
-		return m.Data
+		return m.HealthCheck
 	}
 	return nil
 }
 
-func (m *TaskInfo) GetHealthCheck() *HealthCheck {
+func (m *TaskInfo) GetKillPolicy() *KillPolicy {
 	if m != nil {
-		return m.HealthCheck
+		return m.KillPolicy
+	}
+	return nil
+}
+
+func (m *TaskInfo) GetData() []byte {
+	if m != nil {
+		return m.Data
 	}
 	return nil
 }
@@ -3234,13 +4666,155 @@ func (m *TaskInfo) GetDiscovery() *DiscoveryInfo {
 }
 
 // *
+// Describes a task, similar to `TaskInfo`.
+//
+// `Task` is used in some of the Mesos messages found below.
+// `Task` is used instead of `TaskInfo` if:
+//   1) we need additional IDs, such as a specific
+//      framework, executor, or agent; or
+//   2) we do not need the additional data, such as the command run by the
+//      task or the health checks.  These additional fields may be large and
+//      unnecessary for some Mesos messages.
+//
+// `Task` is generally constructed from a `TaskInfo`.  See protobuf::createTask.
+type Task struct {
+	Name        *string       `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	TaskId      *TaskID       `protobuf:"bytes,2,req,name=task_id" json:"task_id,omitempty"`
+	FrameworkId *FrameworkID  `protobuf:"bytes,3,req,name=framework_id" json:"framework_id,omitempty"`
+	ExecutorId  *ExecutorID   `protobuf:"bytes,4,opt,name=executor_id" json:"executor_id,omitempty"`
+	AgentId     *AgentID      `protobuf:"bytes,5,req,name=agent_id" json:"agent_id,omitempty"`
+	State       *TaskState    `protobuf:"varint,6,req,name=state,enum=mesos.v1.TaskState" json:"state,omitempty"`
+	Resources   []*Resource   `protobuf:"bytes,7,rep,name=resources" json:"resources,omitempty"`
+	Statuses    []*TaskStatus `protobuf:"bytes,8,rep,name=statuses" json:"statuses,omitempty"`
+	// These fields correspond to the state and uuid of the latest
+	// status update forwarded to the master.
+	// NOTE: Either both the fields must be set or both must be unset.
+	StatusUpdateState *TaskState `protobuf:"varint,9,opt,name=status_update_state,enum=mesos.v1.TaskState" json:"status_update_state,omitempty"`
+	StatusUpdateUuid  []byte     `protobuf:"bytes,10,opt,name=status_update_uuid" json:"status_update_uuid,omitempty"`
+	Labels            *Labels    `protobuf:"bytes,11,opt,name=labels" json:"labels,omitempty"`
+	// Service discovery information for the task. It is not interpreted
+	// or acted upon by Mesos. It is up to a service discovery system
+	// to use this information as needed and to handle tasks without
+	// service discovery information.
+	Discovery *DiscoveryInfo `protobuf:"bytes,12,opt,name=discovery" json:"discovery,omitempty"`
+	// Container information for the task.
+	Container *ContainerInfo `protobuf:"bytes,13,opt,name=container" json:"container,omitempty"`
+	// Specific user under which task is running.
+	User             *string `protobuf:"bytes,14,opt,name=user" json:"user,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *Task) Reset()                    { *m = Task{} }
+func (m *Task) String() string            { return proto.CompactTextString(m) }
+func (*Task) ProtoMessage()               {}
+func (*Task) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{36} }
+
+func (m *Task) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *Task) GetTaskId() *TaskID {
+	if m != nil {
+		return m.TaskId
+	}
+	return nil
+}
+
+func (m *Task) GetFrameworkId() *FrameworkID {
+	if m != nil {
+		return m.FrameworkId
+	}
+	return nil
+}
+
+func (m *Task) GetExecutorId() *ExecutorID {
+	if m != nil {
+		return m.ExecutorId
+	}
+	return nil
+}
+
+func (m *Task) GetAgentId() *AgentID {
+	if m != nil {
+		return m.AgentId
+	}
+	return nil
+}
+
+func (m *Task) GetState() TaskState {
+	if m != nil && m.State != nil {
+		return *m.State
+	}
+	return TaskState_TASK_STAGING
+}
+
+func (m *Task) GetResources() []*Resource {
+	if m != nil {
+		return m.Resources
+	}
+	return nil
+}
+
+func (m *Task) GetStatuses() []*TaskStatus {
+	if m != nil {
+		return m.Statuses
+	}
+	return nil
+}
+
+func (m *Task) GetStatusUpdateState() TaskState {
+	if m != nil && m.StatusUpdateState != nil {
+		return *m.StatusUpdateState
+	}
+	return TaskState_TASK_STAGING
+}
+
+func (m *Task) GetStatusUpdateUuid() []byte {
+	if m != nil {
+		return m.StatusUpdateUuid
+	}
+	return nil
+}
+
+func (m *Task) GetLabels() *Labels {
+	if m != nil {
+		return m.Labels
+	}
+	return nil
+}
+
+func (m *Task) GetDiscovery() *DiscoveryInfo {
+	if m != nil {
+		return m.Discovery
+	}
+	return nil
+}
+
+func (m *Task) GetContainer() *ContainerInfo {
+	if m != nil {
+		return m.Container
+	}
+	return nil
+}
+
+func (m *Task) GetUser() string {
+	if m != nil && m.User != nil {
+		return *m.User
+	}
+	return ""
+}
+
+// *
 // Describes the current status of a task.
 type TaskStatus struct {
 	TaskId     *TaskID            `protobuf:"bytes,1,req,name=task_id" json:"task_id,omitempty"`
-	State      *TaskState         `protobuf:"varint,2,req,name=state,enum=mesosproto.TaskState" json:"state,omitempty"`
+	State      *TaskState         `protobuf:"varint,2,req,name=state,enum=mesos.v1.TaskState" json:"state,omitempty"`
 	Message    *string            `protobuf:"bytes,4,opt,name=message" json:"message,omitempty"`
-	Source     *TaskStatus_Source `protobuf:"varint,9,opt,name=source,enum=mesosproto.TaskStatus_Source" json:"source,omitempty"`
-	Reason     *TaskStatus_Reason `protobuf:"varint,10,opt,name=reason,enum=mesosproto.TaskStatus_Reason" json:"reason,omitempty"`
+	Source     *TaskStatus_Source `protobuf:"varint,9,opt,name=source,enum=mesos.v1.TaskStatus_Source" json:"source,omitempty"`
+	Reason     *TaskStatus_Reason `protobuf:"varint,10,opt,name=reason,enum=mesos.v1.TaskStatus_Reason" json:"reason,omitempty"`
 	Data       []byte             `protobuf:"bytes,3,opt,name=data" json:"data,omitempty"`
 	AgentId    *AgentID           `protobuf:"bytes,5,opt,name=agent_id" json:"agent_id,omitempty"`
 	ExecutorId *ExecutorID        `protobuf:"bytes,7,opt,name=executor_id" json:"executor_id,omitempty"`
@@ -3264,14 +4838,18 @@ type TaskStatus struct {
 	// acted upon by Mesos itself. As opposed to the data field, labels
 	// will be kept in memory on master and agent processes. Therefore,
 	// labels should be used to tag TaskStatus message with light-weight
-	// meta-data.
-	Labels           *Labels `protobuf:"bytes,12,opt,name=labels" json:"labels,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
+	// meta-data.  Labels should not contain duplicate key-value pairs.
+	Labels *Labels `protobuf:"bytes,12,opt,name=labels" json:"labels,omitempty"`
+	// Container related information that is resolved dynamically such as
+	// network address.
+	ContainerStatus  *ContainerStatus `protobuf:"bytes,13,opt,name=container_status" json:"container_status,omitempty"`
+	XXX_unrecognized []byte           `json:"-"`
 }
 
-func (m *TaskStatus) Reset()         { *m = TaskStatus{} }
-func (m *TaskStatus) String() string { return proto.CompactTextString(m) }
-func (*TaskStatus) ProtoMessage()    {}
+func (m *TaskStatus) Reset()                    { *m = TaskStatus{} }
+func (m *TaskStatus) String() string            { return proto.CompactTextString(m) }
+func (*TaskStatus) ProtoMessage()               {}
+func (*TaskStatus) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{37} }
 
 func (m *TaskStatus) GetTaskId() *TaskID {
 	if m != nil {
@@ -3357,6 +4935,13 @@ func (m *TaskStatus) GetLabels() *Labels {
 	return nil
 }
 
+func (m *TaskStatus) GetContainerStatus() *ContainerStatus {
+	if m != nil {
+		return m.ContainerStatus
+	}
+	return nil
+}
+
 // *
 // Describes possible filters that can be applied to unused resources
 // (see SchedulerDriver::launchTasks) to influence the allocator.
@@ -3371,9 +4956,10 @@ type Filters struct {
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *Filters) Reset()         { *m = Filters{} }
-func (m *Filters) String() string { return proto.CompactTextString(m) }
-func (*Filters) ProtoMessage()    {}
+func (m *Filters) Reset()                    { *m = Filters{} }
+func (m *Filters) String() string            { return proto.CompactTextString(m) }
+func (*Filters) ProtoMessage()               {}
+func (*Filters) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{38} }
 
 const Default_Filters_RefuseSeconds float64 = 5
 
@@ -3393,9 +4979,10 @@ type Environment struct {
 	XXX_unrecognized []byte                  `json:"-"`
 }
 
-func (m *Environment) Reset()         { *m = Environment{} }
-func (m *Environment) String() string { return proto.CompactTextString(m) }
-func (*Environment) ProtoMessage()    {}
+func (m *Environment) Reset()                    { *m = Environment{} }
+func (m *Environment) String() string            { return proto.CompactTextString(m) }
+func (*Environment) ProtoMessage()               {}
+func (*Environment) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{39} }
 
 func (m *Environment) GetVariables() []*Environment_Variable {
 	if m != nil {
@@ -3410,9 +4997,10 @@ type Environment_Variable struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Environment_Variable) Reset()         { *m = Environment_Variable{} }
-func (m *Environment_Variable) String() string { return proto.CompactTextString(m) }
-func (*Environment_Variable) ProtoMessage()    {}
+func (m *Environment_Variable) Reset()                    { *m = Environment_Variable{} }
+func (m *Environment_Variable) String() string            { return proto.CompactTextString(m) }
+func (*Environment_Variable) ProtoMessage()               {}
+func (*Environment_Variable) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{39, 0} }
 
 func (m *Environment_Variable) GetName() string {
 	if m != nil && m.Name != nil {
@@ -3436,9 +5024,10 @@ type Parameter struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Parameter) Reset()         { *m = Parameter{} }
-func (m *Parameter) String() string { return proto.CompactTextString(m) }
-func (*Parameter) ProtoMessage()    {}
+func (m *Parameter) Reset()                    { *m = Parameter{} }
+func (m *Parameter) String() string            { return proto.CompactTextString(m) }
+func (*Parameter) ProtoMessage()               {}
+func (*Parameter) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{40} }
 
 func (m *Parameter) GetKey() string {
 	if m != nil && m.Key != nil {
@@ -3461,9 +5050,10 @@ type Parameters struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *Parameters) Reset()         { *m = Parameters{} }
-func (m *Parameters) String() string { return proto.CompactTextString(m) }
-func (*Parameters) ProtoMessage()    {}
+func (m *Parameters) Reset()                    { *m = Parameters{} }
+func (m *Parameters) String() string            { return proto.CompactTextString(m) }
+func (*Parameters) ProtoMessage()               {}
+func (*Parameters) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{41} }
 
 func (m *Parameters) GetParameter() []*Parameter {
 	if m != nil {
@@ -3482,13 +5072,14 @@ func (m *Parameters) GetParameter() []*Parameter {
 // framework's executors/tasks are run.
 type Credential struct {
 	Principal        *string `protobuf:"bytes,1,req,name=principal" json:"principal,omitempty"`
-	Secret           []byte  `protobuf:"bytes,2,opt,name=secret" json:"secret,omitempty"`
+	Secret           *string `protobuf:"bytes,2,opt,name=secret" json:"secret,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Credential) Reset()         { *m = Credential{} }
-func (m *Credential) String() string { return proto.CompactTextString(m) }
-func (*Credential) ProtoMessage()    {}
+func (m *Credential) Reset()                    { *m = Credential{} }
+func (m *Credential) String() string            { return proto.CompactTextString(m) }
+func (*Credential) ProtoMessage()               {}
+func (*Credential) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{42} }
 
 func (m *Credential) GetPrincipal() string {
 	if m != nil && m.Principal != nil {
@@ -3497,11 +5088,11 @@ func (m *Credential) GetPrincipal() string {
 	return ""
 }
 
-func (m *Credential) GetSecret() []byte {
-	if m != nil {
-		return m.Secret
+func (m *Credential) GetSecret() string {
+	if m != nil && m.Secret != nil {
+		return *m.Secret
 	}
-	return nil
+	return ""
 }
 
 // *
@@ -3513,194 +5104,14 @@ type Credentials struct {
 	XXX_unrecognized []byte        `json:"-"`
 }
 
-func (m *Credentials) Reset()         { *m = Credentials{} }
-func (m *Credentials) String() string { return proto.CompactTextString(m) }
-func (*Credentials) ProtoMessage()    {}
+func (m *Credentials) Reset()                    { *m = Credentials{} }
+func (m *Credentials) String() string            { return proto.CompactTextString(m) }
+func (*Credentials) ProtoMessage()               {}
+func (*Credentials) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{43} }
 
 func (m *Credentials) GetCredentials() []*Credential {
 	if m != nil {
 		return m.Credentials
-	}
-	return nil
-}
-
-// *
-// ACLs used for authorization.
-type ACL struct {
-	XXX_unrecognized []byte `json:"-"`
-}
-
-func (m *ACL) Reset()         { *m = ACL{} }
-func (m *ACL) String() string { return proto.CompactTextString(m) }
-func (*ACL) ProtoMessage()    {}
-
-// Entity is used to describe a subject(s) or an object(s) of an ACL.
-// NOTE:
-// To allow everyone access to an Entity set its type to 'ANY'.
-// To deny access to an Entity set its type to 'NONE'.
-type ACL_Entity struct {
-	Type             *ACL_Entity_Type `protobuf:"varint,1,opt,name=type,enum=mesosproto.ACL_Entity_Type,def=0" json:"type,omitempty"`
-	Values           []string         `protobuf:"bytes,2,rep,name=values" json:"values,omitempty"`
-	XXX_unrecognized []byte           `json:"-"`
-}
-
-func (m *ACL_Entity) Reset()         { *m = ACL_Entity{} }
-func (m *ACL_Entity) String() string { return proto.CompactTextString(m) }
-func (*ACL_Entity) ProtoMessage()    {}
-
-const Default_ACL_Entity_Type ACL_Entity_Type = ACL_Entity_SOME
-
-func (m *ACL_Entity) GetType() ACL_Entity_Type {
-	if m != nil && m.Type != nil {
-		return *m.Type
-	}
-	return Default_ACL_Entity_Type
-}
-
-func (m *ACL_Entity) GetValues() []string {
-	if m != nil {
-		return m.Values
-	}
-	return nil
-}
-
-// ACLs.
-type ACL_RegisterFramework struct {
-	// Subjects.
-	Principals *ACL_Entity `protobuf:"bytes,1,req,name=principals" json:"principals,omitempty"`
-	// Objects.
-	Roles            *ACL_Entity `protobuf:"bytes,2,req,name=roles" json:"roles,omitempty"`
-	XXX_unrecognized []byte      `json:"-"`
-}
-
-func (m *ACL_RegisterFramework) Reset()         { *m = ACL_RegisterFramework{} }
-func (m *ACL_RegisterFramework) String() string { return proto.CompactTextString(m) }
-func (*ACL_RegisterFramework) ProtoMessage()    {}
-
-func (m *ACL_RegisterFramework) GetPrincipals() *ACL_Entity {
-	if m != nil {
-		return m.Principals
-	}
-	return nil
-}
-
-func (m *ACL_RegisterFramework) GetRoles() *ACL_Entity {
-	if m != nil {
-		return m.Roles
-	}
-	return nil
-}
-
-type ACL_RunTask struct {
-	// Subjects.
-	Principals *ACL_Entity `protobuf:"bytes,1,req,name=principals" json:"principals,omitempty"`
-	// Objects.
-	Users            *ACL_Entity `protobuf:"bytes,2,req,name=users" json:"users,omitempty"`
-	XXX_unrecognized []byte      `json:"-"`
-}
-
-func (m *ACL_RunTask) Reset()         { *m = ACL_RunTask{} }
-func (m *ACL_RunTask) String() string { return proto.CompactTextString(m) }
-func (*ACL_RunTask) ProtoMessage()    {}
-
-func (m *ACL_RunTask) GetPrincipals() *ACL_Entity {
-	if m != nil {
-		return m.Principals
-	}
-	return nil
-}
-
-func (m *ACL_RunTask) GetUsers() *ACL_Entity {
-	if m != nil {
-		return m.Users
-	}
-	return nil
-}
-
-// Which principals are authorized to shutdown frameworks of other
-// principals.
-type ACL_ShutdownFramework struct {
-	// Subjects.
-	Principals *ACL_Entity `protobuf:"bytes,1,req,name=principals" json:"principals,omitempty"`
-	// Objects.
-	FrameworkPrincipals *ACL_Entity `protobuf:"bytes,2,req,name=framework_principals" json:"framework_principals,omitempty"`
-	XXX_unrecognized    []byte      `json:"-"`
-}
-
-func (m *ACL_ShutdownFramework) Reset()         { *m = ACL_ShutdownFramework{} }
-func (m *ACL_ShutdownFramework) String() string { return proto.CompactTextString(m) }
-func (*ACL_ShutdownFramework) ProtoMessage()    {}
-
-func (m *ACL_ShutdownFramework) GetPrincipals() *ACL_Entity {
-	if m != nil {
-		return m.Principals
-	}
-	return nil
-}
-
-func (m *ACL_ShutdownFramework) GetFrameworkPrincipals() *ACL_Entity {
-	if m != nil {
-		return m.FrameworkPrincipals
-	}
-	return nil
-}
-
-// *
-// Collection of ACL.
-//
-// Each authorization request is evaluated against the ACLs in the order
-// they are defined.
-//
-// For simplicity, the ACLs for a given action are not aggregated even
-// when they have the same subjects or objects. The first ACL that
-// matches the request determines whether that request should be
-// permitted or not. An ACL matches iff both the subjects
-// (e.g., clients, principals) and the objects (e.g., urls, users,
-// roles) of the ACL match the request.
-//
-// If none of the ACLs match the request, the 'permissive' field
-// determines whether the request should be permitted or not.
-//
-// TODO(vinod): Do aggregation of ACLs when possible.
-//
-type ACLs struct {
-	Permissive         *bool                    `protobuf:"varint,1,opt,name=permissive,def=1" json:"permissive,omitempty"`
-	RegisterFrameworks []*ACL_RegisterFramework `protobuf:"bytes,2,rep,name=register_frameworks" json:"register_frameworks,omitempty"`
-	RunTasks           []*ACL_RunTask           `protobuf:"bytes,3,rep,name=run_tasks" json:"run_tasks,omitempty"`
-	ShutdownFrameworks []*ACL_ShutdownFramework `protobuf:"bytes,4,rep,name=shutdown_frameworks" json:"shutdown_frameworks,omitempty"`
-	XXX_unrecognized   []byte                   `json:"-"`
-}
-
-func (m *ACLs) Reset()         { *m = ACLs{} }
-func (m *ACLs) String() string { return proto.CompactTextString(m) }
-func (*ACLs) ProtoMessage()    {}
-
-const Default_ACLs_Permissive bool = true
-
-func (m *ACLs) GetPermissive() bool {
-	if m != nil && m.Permissive != nil {
-		return *m.Permissive
-	}
-	return Default_ACLs_Permissive
-}
-
-func (m *ACLs) GetRegisterFrameworks() []*ACL_RegisterFramework {
-	if m != nil {
-		return m.RegisterFrameworks
-	}
-	return nil
-}
-
-func (m *ACLs) GetRunTasks() []*ACL_RunTask {
-	if m != nil {
-		return m.RunTasks
-	}
-	return nil
-}
-
-func (m *ACLs) GetShutdownFrameworks() []*ACL_ShutdownFramework {
-	if m != nil {
-		return m.ShutdownFrameworks
 	}
 	return nil
 }
@@ -3714,7 +5125,7 @@ type RateLimit struct {
 	// which also implies unlimited capacity.
 	Qps *float64 `protobuf:"fixed64,1,opt,name=qps" json:"qps,omitempty"`
 	// Principal of framework(s) to be throttled. Should match
-	// FrameworkInfo.princpal and Credential.principal (if using authentication).
+	// FrameworkInfo.principal and Credential.principal (if using authentication).
 	Principal *string `protobuf:"bytes,2,req,name=principal" json:"principal,omitempty"`
 	// Max number of outstanding messages from frameworks of this principal
 	// allowed by master before the next message is dropped and an error is sent
@@ -3726,9 +5137,10 @@ type RateLimit struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *RateLimit) Reset()         { *m = RateLimit{} }
-func (m *RateLimit) String() string { return proto.CompactTextString(m) }
-func (*RateLimit) ProtoMessage()    {}
+func (m *RateLimit) Reset()                    { *m = RateLimit{} }
+func (m *RateLimit) String() string            { return proto.CompactTextString(m) }
+func (*RateLimit) ProtoMessage()               {}
+func (*RateLimit) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{44} }
 
 func (m *RateLimit) GetQps() float64 {
 	if m != nil && m.Qps != nil {
@@ -3768,9 +5180,10 @@ type RateLimits struct {
 	XXX_unrecognized         []byte  `json:"-"`
 }
 
-func (m *RateLimits) Reset()         { *m = RateLimits{} }
-func (m *RateLimits) String() string { return proto.CompactTextString(m) }
-func (*RateLimits) ProtoMessage()    {}
+func (m *RateLimits) Reset()                    { *m = RateLimits{} }
+func (m *RateLimits) String() string            { return proto.CompactTextString(m) }
+func (*RateLimits) ProtoMessage()               {}
+func (*RateLimits) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{45} }
 
 func (m *RateLimits) GetLimits() []*RateLimit {
 	if m != nil {
@@ -3797,16 +5210,24 @@ func (m *RateLimits) GetAggregateDefaultCapacity() uint64 {
 // Describe an image used by tasks or executors. Note that it's only
 // for tasks or executors launched by MesosContainerizer currently.
 type Image struct {
-	Type *Image_Type `protobuf:"varint,1,req,name=type,enum=mesosproto.Image_Type" json:"type,omitempty"`
+	Type *Image_Type `protobuf:"varint,1,req,name=type,enum=mesos.v1.Image_Type" json:"type,omitempty"`
 	// Only one of the following image messages should be set to match
 	// the type.
-	Appc             *Image_AppC `protobuf:"bytes,2,opt,name=appc" json:"appc,omitempty"`
-	XXX_unrecognized []byte      `json:"-"`
+	Appc   *Image_Appc   `protobuf:"bytes,2,opt,name=appc" json:"appc,omitempty"`
+	Docker *Image_Docker `protobuf:"bytes,3,opt,name=docker" json:"docker,omitempty"`
+	// With this flag set to false, the mesos containerizer will pull
+	// the docker/appc image from the registry even if the image is
+	// already downloaded on the agent.
+	Cached           *bool  `protobuf:"varint,4,opt,name=cached,def=1" json:"cached,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
 }
 
-func (m *Image) Reset()         { *m = Image{} }
-func (m *Image) String() string { return proto.CompactTextString(m) }
-func (*Image) ProtoMessage()    {}
+func (m *Image) Reset()                    { *m = Image{} }
+func (m *Image) String() string            { return proto.CompactTextString(m) }
+func (*Image) ProtoMessage()               {}
+func (*Image) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{46} }
+
+const Default_Image_Cached bool = true
 
 func (m *Image) GetType() Image_Type {
 	if m != nil && m.Type != nil {
@@ -3815,49 +5236,96 @@ func (m *Image) GetType() Image_Type {
 	return Image_APPC
 }
 
-func (m *Image) GetAppc() *Image_AppC {
+func (m *Image) GetAppc() *Image_Appc {
 	if m != nil {
 		return m.Appc
 	}
 	return nil
 }
 
+func (m *Image) GetDocker() *Image_Docker {
+	if m != nil {
+		return m.Docker
+	}
+	return nil
+}
+
+func (m *Image) GetCached() bool {
+	if m != nil && m.Cached != nil {
+		return *m.Cached
+	}
+	return Default_Image_Cached
+}
+
 // Protobuf for specifying an Appc container image. See:
 // https://github.com/appc/spec/blob/master/spec/aci.md
-type Image_AppC struct {
+type Image_Appc struct {
 	// The name of the image.
 	Name *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
 	// An image ID is a string of the format "hash-value", where
 	// "hash" is the hash algorithm used and "value" is the hex
 	// encoded string of the digest. Currently the only permitted
 	// hash algorithm is sha512.
-	Id *string `protobuf:"bytes,2,req,name=id" json:"id,omitempty"`
+	Id *string `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
 	// Optional labels. Suggested labels: "version", "os", and "arch".
 	Labels           *Labels `protobuf:"bytes,3,opt,name=labels" json:"labels,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Image_AppC) Reset()         { *m = Image_AppC{} }
-func (m *Image_AppC) String() string { return proto.CompactTextString(m) }
-func (*Image_AppC) ProtoMessage()    {}
+func (m *Image_Appc) Reset()                    { *m = Image_Appc{} }
+func (m *Image_Appc) String() string            { return proto.CompactTextString(m) }
+func (*Image_Appc) ProtoMessage()               {}
+func (*Image_Appc) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{46, 0} }
 
-func (m *Image_AppC) GetName() string {
+func (m *Image_Appc) GetName() string {
 	if m != nil && m.Name != nil {
 		return *m.Name
 	}
 	return ""
 }
 
-func (m *Image_AppC) GetId() string {
+func (m *Image_Appc) GetId() string {
 	if m != nil && m.Id != nil {
 		return *m.Id
 	}
 	return ""
 }
 
-func (m *Image_AppC) GetLabels() *Labels {
+func (m *Image_Appc) GetLabels() *Labels {
 	if m != nil {
 		return m.Labels
+	}
+	return nil
+}
+
+type Image_Docker struct {
+	// The name of the image. Expected format:
+	//   [REGISTRY_HOST[:REGISTRY_PORT]/]REPOSITORY[:TAG|@TYPE:DIGEST]
+	//
+	// See: https://docs.docker.com/reference/commandline/pull/
+	Name *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	// Credential to authenticate with docker registry.
+	// NOTE: This is not encrypted, therefore framework and operators
+	// should enable SSL when passing this information.
+	Credential       *Credential `protobuf:"bytes,2,opt,name=credential" json:"credential,omitempty"`
+	XXX_unrecognized []byte      `json:"-"`
+}
+
+func (m *Image_Docker) Reset()                    { *m = Image_Docker{} }
+func (m *Image_Docker) String() string            { return proto.CompactTextString(m) }
+func (*Image_Docker) ProtoMessage()               {}
+func (*Image_Docker) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{46, 1} }
+
+func (m *Image_Docker) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *Image_Docker) GetCredential() *Credential {
+	if m != nil {
+		return m.Credential
 	}
 	return nil
 }
@@ -3866,21 +5334,27 @@ func (m *Image_AppC) GetLabels() *Labels {
 // Describes a volume mapping either from host to container or vice
 // versa. Both paths can either refer to a directory or a file.
 type Volume struct {
-	Mode *Volume_Mode `protobuf:"varint,3,req,name=mode,enum=mesosproto.Volume_Mode" json:"mode,omitempty"`
-	// Absolute path pointing to a directory or file in the container.
+	// TODO(gyliu513): Make this as `optional` after deprecation cycle of 1.0.
+	Mode *Volume_Mode `protobuf:"varint,3,req,name=mode,enum=mesos.v1.Volume_Mode" json:"mode,omitempty"`
+	// Path pointing to a directory or file in the container. If the
+	// path is a relative path, it is relative to the container work
+	// directory. If the path is an absolute path, that path must
+	// already exist.
 	ContainerPath *string `protobuf:"bytes,1,req,name=container_path" json:"container_path,omitempty"`
 	// Absolute path pointing to a directory or file on the host or a
 	// path relative to the container work directory.
 	HostPath *string `protobuf:"bytes,2,opt,name=host_path" json:"host_path,omitempty"`
 	// The source of the volume is an Image which describes a root
 	// filesystem which will be provisioned by Mesos.
-	Image            *Image `protobuf:"bytes,4,opt,name=image" json:"image,omitempty"`
-	XXX_unrecognized []byte `json:"-"`
+	Image            *Image         `protobuf:"bytes,4,opt,name=image" json:"image,omitempty"`
+	Source           *Volume_Source `protobuf:"bytes,5,opt,name=source" json:"source,omitempty"`
+	XXX_unrecognized []byte         `json:"-"`
 }
 
-func (m *Volume) Reset()         { *m = Volume{} }
-func (m *Volume) String() string { return proto.CompactTextString(m) }
-func (*Volume) ProtoMessage()    {}
+func (m *Volume) Reset()                    { *m = Volume{} }
+func (m *Volume) String() string            { return proto.CompactTextString(m) }
+func (*Volume) ProtoMessage()               {}
+func (*Volume) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{47} }
 
 func (m *Volume) GetMode() Volume_Mode {
 	if m != nil && m.Mode != nil {
@@ -3910,23 +5384,219 @@ func (m *Volume) GetImage() *Image {
 	return nil
 }
 
+func (m *Volume) GetSource() *Volume_Source {
+	if m != nil {
+		return m.Source
+	}
+	return nil
+}
+
+// Describes where a volume originates from.
+type Volume_Source struct {
+	// Enum fields should be optional, see: MESOS-4997.
+	Type *Volume_Source_Type `protobuf:"varint,1,opt,name=type,enum=mesos.v1.Volume_Source_Type" json:"type,omitempty"`
+	// The source of the volume created by docker volume driver.
+	DockerVolume     *Volume_Source_DockerVolume `protobuf:"bytes,2,opt,name=docker_volume" json:"docker_volume,omitempty"`
+	XXX_unrecognized []byte                      `json:"-"`
+}
+
+func (m *Volume_Source) Reset()                    { *m = Volume_Source{} }
+func (m *Volume_Source) String() string            { return proto.CompactTextString(m) }
+func (*Volume_Source) ProtoMessage()               {}
+func (*Volume_Source) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{47, 0} }
+
+func (m *Volume_Source) GetType() Volume_Source_Type {
+	if m != nil && m.Type != nil {
+		return *m.Type
+	}
+	return Volume_Source_UNKNOWN
+}
+
+func (m *Volume_Source) GetDockerVolume() *Volume_Source_DockerVolume {
+	if m != nil {
+		return m.DockerVolume
+	}
+	return nil
+}
+
+type Volume_Source_DockerVolume struct {
+	// Driver of the volume, it can be flocker, convoy, raxrey etc.
+	Driver *string `protobuf:"bytes,1,opt,name=driver" json:"driver,omitempty"`
+	// Name of the volume.
+	Name *string `protobuf:"bytes,2,req,name=name" json:"name,omitempty"`
+	// Volume driver specific options.
+	DriverOptions    *Parameters `protobuf:"bytes,3,opt,name=driver_options" json:"driver_options,omitempty"`
+	XXX_unrecognized []byte      `json:"-"`
+}
+
+func (m *Volume_Source_DockerVolume) Reset()         { *m = Volume_Source_DockerVolume{} }
+func (m *Volume_Source_DockerVolume) String() string { return proto.CompactTextString(m) }
+func (*Volume_Source_DockerVolume) ProtoMessage()    {}
+func (*Volume_Source_DockerVolume) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{47, 0, 0}
+}
+
+func (m *Volume_Source_DockerVolume) GetDriver() string {
+	if m != nil && m.Driver != nil {
+		return *m.Driver
+	}
+	return ""
+}
+
+func (m *Volume_Source_DockerVolume) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *Volume_Source_DockerVolume) GetDriverOptions() *Parameters {
+	if m != nil {
+		return m.DriverOptions
+	}
+	return nil
+}
+
+// *
+// Describes a network request from a framework as well as network resolution
+// provided by Mesos.
+//
+// A framework may request the network isolator on the Agent to isolate the
+// container in a network namespace and create a virtual network interface.
+// The `NetworkInfo` message describes the properties of that virtual
+// interface, including the IP addresses and network isolation policy
+// (network group membership).
+//
+// The NetworkInfo message is not interpreted by the Master or Agent and is
+// intended to be used by Agent and Master modules implementing network
+// isolation. If the modules are missing, the message is simply ignored. In
+// future, the task launch will fail if there is no module providing the
+// network isolation capabilities (MESOS-3390).
+//
+// An executor, Agent, or an Agent module may append NetworkInfos inside
+// TaskStatus::container_status to provide information such as the container IP
+// address and isolation groups.
+type NetworkInfo struct {
+	// When included in a ContainerInfo, each of these represent a
+	// request for an IP address. Each request can specify an explicit address
+	// or the IP protocol to use.
+	//
+	// When included in a TaskStatus message, these inform the framework
+	// scheduler about the IP addresses that are bound to the container
+	// interface. When there are no custom network isolator modules installed,
+	// this field is filled in automatically with the Agent IP address.
+	IpAddresses []*NetworkInfo_IPAddress `protobuf:"bytes,5,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
+	// Name of the network which will be used by network isolator to determine
+	// the network that the container joins. It's up to the network isolator
+	// to decide how to interpret this field.
+	Name *string `protobuf:"bytes,6,opt,name=name" json:"name,omitempty"`
+	// A group is the name given to a set of logically-related interfaces that
+	// are allowed to communicate among themselves. Network traffic is allowed
+	// between two container interfaces that share at least one network group.
+	// For example, one might want to create separate groups for isolating dev,
+	// testing, qa and prod deployment environments.
+	Groups []string `protobuf:"bytes,3,rep,name=groups" json:"groups,omitempty"`
+	// To tag certain metadata to be used by Isolator/IPAM, e.g., rack, etc.
+	Labels           *Labels `protobuf:"bytes,4,opt,name=labels" json:"labels,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *NetworkInfo) Reset()                    { *m = NetworkInfo{} }
+func (m *NetworkInfo) String() string            { return proto.CompactTextString(m) }
+func (*NetworkInfo) ProtoMessage()               {}
+func (*NetworkInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{48} }
+
+func (m *NetworkInfo) GetIpAddresses() []*NetworkInfo_IPAddress {
+	if m != nil {
+		return m.IpAddresses
+	}
+	return nil
+}
+
+func (m *NetworkInfo) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *NetworkInfo) GetGroups() []string {
+	if m != nil {
+		return m.Groups
+	}
+	return nil
+}
+
+func (m *NetworkInfo) GetLabels() *Labels {
+	if m != nil {
+		return m.Labels
+	}
+	return nil
+}
+
+// Specifies a request for an IP address, or reports the assigned container
+// IP address.
+//
+// Users can request an automatically assigned IP (for example, via an
+// IPAM service) or a specific IP by adding a NetworkInfo to the
+// ContainerInfo for a task.  On a request, specifying neither `protocol`
+// nor `ip_address` means that any available address may be assigned.
+type NetworkInfo_IPAddress struct {
+	// Specify IP address requirement. Set protocol to the desired value to
+	// request the network isolator on the Agent to assign an IP address to the
+	// container being launched. If a specific IP address is specified in
+	// ip_address, this field should not be set.
+	Protocol *NetworkInfo_Protocol `protobuf:"varint,1,opt,name=protocol,enum=mesos.v1.NetworkInfo_Protocol" json:"protocol,omitempty"`
+	// Statically assigned IP provided by the Framework. This IP will be
+	// assigned to the container by the network isolator module on the Agent.
+	// This field should not be used with the protocol field above.
+	//
+	// If an explicit address is requested but is unavailable, the network
+	// isolator should fail the task.
+	IpAddress        *string `protobuf:"bytes,2,opt,name=ip_address" json:"ip_address,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *NetworkInfo_IPAddress) Reset()                    { *m = NetworkInfo_IPAddress{} }
+func (m *NetworkInfo_IPAddress) String() string            { return proto.CompactTextString(m) }
+func (*NetworkInfo_IPAddress) ProtoMessage()               {}
+func (*NetworkInfo_IPAddress) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{48, 0} }
+
+func (m *NetworkInfo_IPAddress) GetProtocol() NetworkInfo_Protocol {
+	if m != nil && m.Protocol != nil {
+		return *m.Protocol
+	}
+	return NetworkInfo_IPv4
+}
+
+func (m *NetworkInfo_IPAddress) GetIpAddress() string {
+	if m != nil && m.IpAddress != nil {
+		return *m.IpAddress
+	}
+	return ""
+}
+
 // *
 // Describes a container configuration and allows extensible
 // configurations for different container implementations.
 type ContainerInfo struct {
-	Type     *ContainerInfo_Type `protobuf:"varint,1,req,name=type,enum=mesosproto.ContainerInfo_Type" json:"type,omitempty"`
+	Type     *ContainerInfo_Type `protobuf:"varint,1,req,name=type,enum=mesos.v1.ContainerInfo_Type" json:"type,omitempty"`
 	Volumes  []*Volume           `protobuf:"bytes,2,rep,name=volumes" json:"volumes,omitempty"`
 	Hostname *string             `protobuf:"bytes,4,opt,name=hostname" json:"hostname,omitempty"`
 	// Only one of the following *Info messages should be set to match
 	// the type.
-	Docker           *ContainerInfo_DockerInfo `protobuf:"bytes,3,opt,name=docker" json:"docker,omitempty"`
-	Mesos            *ContainerInfo_MesosInfo  `protobuf:"bytes,5,opt,name=mesos" json:"mesos,omitempty"`
-	XXX_unrecognized []byte                    `json:"-"`
+	Docker *ContainerInfo_DockerInfo `protobuf:"bytes,3,opt,name=docker" json:"docker,omitempty"`
+	Mesos  *ContainerInfo_MesosInfo  `protobuf:"bytes,5,opt,name=mesos" json:"mesos,omitempty"`
+	// A list of network requests. A framework can request multiple IP addresses
+	// for the container.
+	NetworkInfos     []*NetworkInfo `protobuf:"bytes,7,rep,name=network_infos" json:"network_infos,omitempty"`
+	XXX_unrecognized []byte         `json:"-"`
 }
 
-func (m *ContainerInfo) Reset()         { *m = ContainerInfo{} }
-func (m *ContainerInfo) String() string { return proto.CompactTextString(m) }
-func (*ContainerInfo) ProtoMessage()    {}
+func (m *ContainerInfo) Reset()                    { *m = ContainerInfo{} }
+func (m *ContainerInfo) String() string            { return proto.CompactTextString(m) }
+func (*ContainerInfo) ProtoMessage()               {}
+func (*ContainerInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{49} }
 
 func (m *ContainerInfo) GetType() ContainerInfo_Type {
 	if m != nil && m.Type != nil {
@@ -3963,10 +5633,17 @@ func (m *ContainerInfo) GetMesos() *ContainerInfo_MesosInfo {
 	return nil
 }
 
+func (m *ContainerInfo) GetNetworkInfos() []*NetworkInfo {
+	if m != nil {
+		return m.NetworkInfos
+	}
+	return nil
+}
+
 type ContainerInfo_DockerInfo struct {
 	// The docker image that is going to be passed to the registry.
 	Image        *string                                 `protobuf:"bytes,1,req,name=image" json:"image,omitempty"`
-	Network      *ContainerInfo_DockerInfo_Network       `protobuf:"varint,2,opt,name=network,enum=mesosproto.ContainerInfo_DockerInfo_Network,def=1" json:"network,omitempty"`
+	Network      *ContainerInfo_DockerInfo_Network       `protobuf:"varint,2,opt,name=network,enum=mesos.v1.ContainerInfo_DockerInfo_Network,def=1" json:"network,omitempty"`
 	PortMappings []*ContainerInfo_DockerInfo_PortMapping `protobuf:"bytes,3,rep,name=port_mappings" json:"port_mappings,omitempty"`
 	Privileged   *bool                                   `protobuf:"varint,4,opt,name=privileged,def=0" json:"privileged,omitempty"`
 	// Allowing arbitrary parameters to be passed to docker CLI.
@@ -3977,13 +5654,16 @@ type ContainerInfo_DockerInfo struct {
 	// With this flag set to true, the docker containerizer will
 	// pull the docker image from the registry even if the image
 	// is already downloaded on the agent.
-	ForcePullImage   *bool  `protobuf:"varint,6,opt,name=force_pull_image" json:"force_pull_image,omitempty"`
-	XXX_unrecognized []byte `json:"-"`
+	ForcePullImage *bool `protobuf:"varint,6,opt,name=force_pull_image" json:"force_pull_image,omitempty"`
+	// The name of volume driver plugin.
+	VolumeDriver     *string `protobuf:"bytes,7,opt,name=volume_driver" json:"volume_driver,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *ContainerInfo_DockerInfo) Reset()         { *m = ContainerInfo_DockerInfo{} }
-func (m *ContainerInfo_DockerInfo) String() string { return proto.CompactTextString(m) }
-func (*ContainerInfo_DockerInfo) ProtoMessage()    {}
+func (m *ContainerInfo_DockerInfo) Reset()                    { *m = ContainerInfo_DockerInfo{} }
+func (m *ContainerInfo_DockerInfo) String() string            { return proto.CompactTextString(m) }
+func (*ContainerInfo_DockerInfo) ProtoMessage()               {}
+func (*ContainerInfo_DockerInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{49, 0} }
 
 const Default_ContainerInfo_DockerInfo_Network ContainerInfo_DockerInfo_Network = ContainerInfo_DockerInfo_HOST
 const Default_ContainerInfo_DockerInfo_Privileged bool = false
@@ -4030,6 +5710,13 @@ func (m *ContainerInfo_DockerInfo) GetForcePullImage() bool {
 	return false
 }
 
+func (m *ContainerInfo_DockerInfo) GetVolumeDriver() string {
+	if m != nil && m.VolumeDriver != nil {
+		return *m.VolumeDriver
+	}
+	return ""
+}
+
 type ContainerInfo_DockerInfo_PortMapping struct {
 	HostPort      *uint32 `protobuf:"varint,1,req,name=host_port" json:"host_port,omitempty"`
 	ContainerPort *uint32 `protobuf:"varint,2,req,name=container_port" json:"container_port,omitempty"`
@@ -4041,6 +5728,9 @@ type ContainerInfo_DockerInfo_PortMapping struct {
 func (m *ContainerInfo_DockerInfo_PortMapping) Reset()         { *m = ContainerInfo_DockerInfo_PortMapping{} }
 func (m *ContainerInfo_DockerInfo_PortMapping) String() string { return proto.CompactTextString(m) }
 func (*ContainerInfo_DockerInfo_PortMapping) ProtoMessage()    {}
+func (*ContainerInfo_DockerInfo_PortMapping) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{49, 0, 0}
+}
 
 func (m *ContainerInfo_DockerInfo_PortMapping) GetHostPort() uint32 {
 	if m != nil && m.HostPort != nil {
@@ -4068,9 +5758,10 @@ type ContainerInfo_MesosInfo struct {
 	XXX_unrecognized []byte `json:"-"`
 }
 
-func (m *ContainerInfo_MesosInfo) Reset()         { *m = ContainerInfo_MesosInfo{} }
-func (m *ContainerInfo_MesosInfo) String() string { return proto.CompactTextString(m) }
-func (*ContainerInfo_MesosInfo) ProtoMessage()    {}
+func (m *ContainerInfo_MesosInfo) Reset()                    { *m = ContainerInfo_MesosInfo{} }
+func (m *ContainerInfo_MesosInfo) String() string            { return proto.CompactTextString(m) }
+func (*ContainerInfo_MesosInfo) ProtoMessage()               {}
+func (*ContainerInfo_MesosInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{49, 1} }
 
 func (m *ContainerInfo_MesosInfo) GetImage() *Image {
 	if m != nil {
@@ -4080,15 +5771,98 @@ func (m *ContainerInfo_MesosInfo) GetImage() *Image {
 }
 
 // *
-// Collection of labels.
+// Container related information that is resolved during container
+// setup. The information is sent back to the framework as part of the
+// TaskStatus message.
+type ContainerStatus struct {
+	// This field can be reliably used to identify the container IP address.
+	NetworkInfos []*NetworkInfo `protobuf:"bytes,1,rep,name=network_infos" json:"network_infos,omitempty"`
+	// Information about Linux control group (cgroup).
+	CgroupInfo *CgroupInfo `protobuf:"bytes,2,opt,name=cgroup_info" json:"cgroup_info,omitempty"`
+	// Information about Executor PID.
+	ExecutorPid      *uint32 `protobuf:"varint,3,opt,name=executor_pid" json:"executor_pid,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *ContainerStatus) Reset()                    { *m = ContainerStatus{} }
+func (m *ContainerStatus) String() string            { return proto.CompactTextString(m) }
+func (*ContainerStatus) ProtoMessage()               {}
+func (*ContainerStatus) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{50} }
+
+func (m *ContainerStatus) GetNetworkInfos() []*NetworkInfo {
+	if m != nil {
+		return m.NetworkInfos
+	}
+	return nil
+}
+
+func (m *ContainerStatus) GetCgroupInfo() *CgroupInfo {
+	if m != nil {
+		return m.CgroupInfo
+	}
+	return nil
+}
+
+func (m *ContainerStatus) GetExecutorPid() uint32 {
+	if m != nil && m.ExecutorPid != nil {
+		return *m.ExecutorPid
+	}
+	return 0
+}
+
+// *
+// Linux control group (cgroup) information.
+type CgroupInfo struct {
+	NetCls           *CgroupInfo_NetCls `protobuf:"bytes,1,opt,name=net_cls" json:"net_cls,omitempty"`
+	XXX_unrecognized []byte             `json:"-"`
+}
+
+func (m *CgroupInfo) Reset()                    { *m = CgroupInfo{} }
+func (m *CgroupInfo) String() string            { return proto.CompactTextString(m) }
+func (*CgroupInfo) ProtoMessage()               {}
+func (*CgroupInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{51} }
+
+func (m *CgroupInfo) GetNetCls() *CgroupInfo_NetCls {
+	if m != nil {
+		return m.NetCls
+	}
+	return nil
+}
+
+// Configuration of a net_cls cgroup subsystem.
+type CgroupInfo_NetCls struct {
+	// The 32-bit classid consists of two parts, a 16 bit major handle
+	// and a 16-bit minor handle. The major and minor handle are
+	// represented using the format 0xAAAABBBB, where 0xAAAA is the
+	// 16-bit major handle and 0xBBBB is the 16-bit minor handle.
+	Classid          *uint32 `protobuf:"varint,1,opt,name=classid" json:"classid,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *CgroupInfo_NetCls) Reset()                    { *m = CgroupInfo_NetCls{} }
+func (m *CgroupInfo_NetCls) String() string            { return proto.CompactTextString(m) }
+func (*CgroupInfo_NetCls) ProtoMessage()               {}
+func (*CgroupInfo_NetCls) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{51, 0} }
+
+func (m *CgroupInfo_NetCls) GetClassid() uint32 {
+	if m != nil && m.Classid != nil {
+		return *m.Classid
+	}
+	return 0
+}
+
+// *
+// Collection of labels. Labels should not contain duplicate key-value
+// pairs.
 type Labels struct {
 	Labels           []*Label `protobuf:"bytes,1,rep,name=labels" json:"labels,omitempty"`
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *Labels) Reset()         { *m = Labels{} }
-func (m *Labels) String() string { return proto.CompactTextString(m) }
-func (*Labels) ProtoMessage()    {}
+func (m *Labels) Reset()                    { *m = Labels{} }
+func (m *Labels) String() string            { return proto.CompactTextString(m) }
+func (*Labels) ProtoMessage()               {}
+func (*Labels) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{52} }
 
 func (m *Labels) GetLabels() []*Label {
 	if m != nil {
@@ -4105,9 +5879,10 @@ type Label struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Label) Reset()         { *m = Label{} }
-func (m *Label) String() string { return proto.CompactTextString(m) }
-func (*Label) ProtoMessage()    {}
+func (m *Label) Reset()                    { *m = Label{} }
+func (m *Label) String() string            { return proto.CompactTextString(m) }
+func (*Label) ProtoMessage()               {}
+func (*Label) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{53} }
 
 func (m *Label) GetKey() string {
 	if m != nil && m.Key != nil {
@@ -4126,15 +5901,27 @@ func (m *Label) GetValue() string {
 // *
 // Named port used for service discovery.
 type Port struct {
-	Number           *uint32 `protobuf:"varint,1,req,name=number" json:"number,omitempty"`
-	Name             *string `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Protocol         *string `protobuf:"bytes,3,opt,name=protocol" json:"protocol,omitempty"`
+	// Port number on which the framework exposes a service.
+	Number *uint32 `protobuf:"varint,1,req,name=number" json:"number,omitempty"`
+	// Name of the service hosted on this port.
+	Name *string `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	// Layer 4-7 protocol on which the framework exposes its services.
+	Protocol *string `protobuf:"bytes,3,opt,name=protocol" json:"protocol,omitempty"`
+	// This field restricts discovery within a framework (FRAMEWORK),
+	// within a Mesos cluster (CLUSTER), or places no restrictions (EXTERNAL).
+	// The visibility setting for a Port overrides the general visibility setting
+	// in the DiscoveryInfo.
+	Visibility *DiscoveryInfo_Visibility `protobuf:"varint,4,opt,name=visibility,enum=mesos.v1.DiscoveryInfo_Visibility" json:"visibility,omitempty"`
+	// This can be used to decorate the message with metadata to be
+	// interpreted by external applications such as firewalls.
+	Labels           *Labels `protobuf:"bytes,5,opt,name=labels" json:"labels,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Port) Reset()         { *m = Port{} }
-func (m *Port) String() string { return proto.CompactTextString(m) }
-func (*Port) ProtoMessage()    {}
+func (m *Port) Reset()                    { *m = Port{} }
+func (m *Port) String() string            { return proto.CompactTextString(m) }
+func (*Port) ProtoMessage()               {}
+func (*Port) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{54} }
 
 func (m *Port) GetNumber() uint32 {
 	if m != nil && m.Number != nil {
@@ -4157,6 +5944,20 @@ func (m *Port) GetProtocol() string {
 	return ""
 }
 
+func (m *Port) GetVisibility() DiscoveryInfo_Visibility {
+	if m != nil && m.Visibility != nil {
+		return *m.Visibility
+	}
+	return DiscoveryInfo_FRAMEWORK
+}
+
+func (m *Port) GetLabels() *Labels {
+	if m != nil {
+		return m.Labels
+	}
+	return nil
+}
+
 // *
 // Collection of ports.
 type Ports struct {
@@ -4164,9 +5965,10 @@ type Ports struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Ports) Reset()         { *m = Ports{} }
-func (m *Ports) String() string { return proto.CompactTextString(m) }
-func (*Ports) ProtoMessage()    {}
+func (m *Ports) Reset()                    { *m = Ports{} }
+func (m *Ports) String() string            { return proto.CompactTextString(m) }
+func (*Ports) ProtoMessage()               {}
+func (*Ports) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{55} }
 
 func (m *Ports) GetPorts() []*Port {
 	if m != nil {
@@ -4177,18 +5979,19 @@ func (m *Ports) GetPorts() []*Port {
 
 // *
 // Service discovery information.
-// The visibility field restricts discovery within a framework
-// (FRAMEWORK), within a Mesos cluster (CLUSTER), or  places no
-// restrictions (EXTERNAL).
-// The environment, location, and version fields provide first class
-// support for common attributes used to differentiate between
-// similar services. The environment may receive values such as
-// PROD/QA/DEV, the location field may receive values like
-// EAST-US/WEST-US/EUROPE/AMEA, and the version field may receive
-// values like v2.0/v0.9. The exact use of these fields is up to each
+// The visibility field restricts discovery within a framework (FRAMEWORK),
+// within a Mesos cluster (CLUSTER), or places no restrictions (EXTERNAL).
+// Each port in the ports field also has an optional visibility field.
+// If visibility is specified for a port, it overrides the default service-wide
+// DiscoveryInfo.visibility for that port.
+// The environment, location, and version fields provide first class support for
+// common attributes used to differentiate between similar services. The
+// environment may receive values such as PROD/QA/DEV, the location field may
+// receive values like EAST-US/WEST-US/EUROPE/AMEA, and the version field may
+// receive values like v2.0/v0.9. The exact use of these fields is up to each
 // service discovery system.
 type DiscoveryInfo struct {
-	Visibility       *DiscoveryInfo_Visibility `protobuf:"varint,1,req,name=visibility,enum=mesosproto.DiscoveryInfo_Visibility" json:"visibility,omitempty"`
+	Visibility       *DiscoveryInfo_Visibility `protobuf:"varint,1,req,name=visibility,enum=mesos.v1.DiscoveryInfo_Visibility" json:"visibility,omitempty"`
 	Name             *string                   `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
 	Environment      *string                   `protobuf:"bytes,3,opt,name=environment" json:"environment,omitempty"`
 	Location         *string                   `protobuf:"bytes,4,opt,name=location" json:"location,omitempty"`
@@ -4198,9 +6001,10 @@ type DiscoveryInfo struct {
 	XXX_unrecognized []byte                    `json:"-"`
 }
 
-func (m *DiscoveryInfo) Reset()         { *m = DiscoveryInfo{} }
-func (m *DiscoveryInfo) String() string { return proto.CompactTextString(m) }
-func (*DiscoveryInfo) ProtoMessage()    {}
+func (m *DiscoveryInfo) Reset()                    { *m = DiscoveryInfo{} }
+func (m *DiscoveryInfo) String() string            { return proto.CompactTextString(m) }
+func (*DiscoveryInfo) ProtoMessage()               {}
+func (*DiscoveryInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{56} }
 
 func (m *DiscoveryInfo) GetVisibility() DiscoveryInfo_Visibility {
 	if m != nil && m.Visibility != nil {
@@ -4251,18 +6055,763 @@ func (m *DiscoveryInfo) GetLabels() *Labels {
 	return nil
 }
 
+// *
+// Named WeightInfo to indicate resource allocation
+// priority between the different roles.
+type WeightInfo struct {
+	Weight *float64 `protobuf:"fixed64,1,req,name=weight" json:"weight,omitempty"`
+	// Related role name.
+	Role             *string `protobuf:"bytes,2,opt,name=role" json:"role,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *WeightInfo) Reset()                    { *m = WeightInfo{} }
+func (m *WeightInfo) String() string            { return proto.CompactTextString(m) }
+func (*WeightInfo) ProtoMessage()               {}
+func (*WeightInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{57} }
+
+func (m *WeightInfo) GetWeight() float64 {
+	if m != nil && m.Weight != nil {
+		return *m.Weight
+	}
+	return 0
+}
+
+func (m *WeightInfo) GetRole() string {
+	if m != nil && m.Role != nil {
+		return *m.Role
+	}
+	return ""
+}
+
+// *
+// Version information of a component.
+type VersionInfo struct {
+	Version          *string  `protobuf:"bytes,1,req,name=version" json:"version,omitempty"`
+	BuildDate        *string  `protobuf:"bytes,2,opt,name=build_date" json:"build_date,omitempty"`
+	BuildTime        *float64 `protobuf:"fixed64,3,opt,name=build_time" json:"build_time,omitempty"`
+	BuildUser        *string  `protobuf:"bytes,4,opt,name=build_user" json:"build_user,omitempty"`
+	GitSha           *string  `protobuf:"bytes,5,opt,name=git_sha" json:"git_sha,omitempty"`
+	GitBranch        *string  `protobuf:"bytes,6,opt,name=git_branch" json:"git_branch,omitempty"`
+	GitTag           *string  `protobuf:"bytes,7,opt,name=git_tag" json:"git_tag,omitempty"`
+	XXX_unrecognized []byte   `json:"-"`
+}
+
+func (m *VersionInfo) Reset()                    { *m = VersionInfo{} }
+func (m *VersionInfo) String() string            { return proto.CompactTextString(m) }
+func (*VersionInfo) ProtoMessage()               {}
+func (*VersionInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{58} }
+
+func (m *VersionInfo) GetVersion() string {
+	if m != nil && m.Version != nil {
+		return *m.Version
+	}
+	return ""
+}
+
+func (m *VersionInfo) GetBuildDate() string {
+	if m != nil && m.BuildDate != nil {
+		return *m.BuildDate
+	}
+	return ""
+}
+
+func (m *VersionInfo) GetBuildTime() float64 {
+	if m != nil && m.BuildTime != nil {
+		return *m.BuildTime
+	}
+	return 0
+}
+
+func (m *VersionInfo) GetBuildUser() string {
+	if m != nil && m.BuildUser != nil {
+		return *m.BuildUser
+	}
+	return ""
+}
+
+func (m *VersionInfo) GetGitSha() string {
+	if m != nil && m.GitSha != nil {
+		return *m.GitSha
+	}
+	return ""
+}
+
+func (m *VersionInfo) GetGitBranch() string {
+	if m != nil && m.GitBranch != nil {
+		return *m.GitBranch
+	}
+	return ""
+}
+
+func (m *VersionInfo) GetGitTag() string {
+	if m != nil && m.GitTag != nil {
+		return *m.GitTag
+	}
+	return ""
+}
+
+// *
+// Flag consists of a name and optionally its value.
+type Flag struct {
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Value            *string `protobuf:"bytes,2,opt,name=value" json:"value,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *Flag) Reset()                    { *m = Flag{} }
+func (m *Flag) String() string            { return proto.CompactTextString(m) }
+func (*Flag) ProtoMessage()               {}
+func (*Flag) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{59} }
+
+func (m *Flag) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *Flag) GetValue() string {
+	if m != nil && m.Value != nil {
+		return *m.Value
+	}
+	return ""
+}
+
+// *
+// Describes a Role. Roles can be used to specify that certain resources are
+// reserved for the use of one or more frameworks.
+type Role struct {
+	Name             *string        `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Weight           *float64       `protobuf:"fixed64,2,req,name=weight" json:"weight,omitempty"`
+	Frameworks       []*FrameworkID `protobuf:"bytes,3,rep,name=frameworks" json:"frameworks,omitempty"`
+	Resources        []*Resource    `protobuf:"bytes,4,rep,name=resources" json:"resources,omitempty"`
+	XXX_unrecognized []byte         `json:"-"`
+}
+
+func (m *Role) Reset()                    { *m = Role{} }
+func (m *Role) String() string            { return proto.CompactTextString(m) }
+func (*Role) ProtoMessage()               {}
+func (*Role) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{60} }
+
+func (m *Role) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *Role) GetWeight() float64 {
+	if m != nil && m.Weight != nil {
+		return *m.Weight
+	}
+	return 0
+}
+
+func (m *Role) GetFrameworks() []*FrameworkID {
+	if m != nil {
+		return m.Frameworks
+	}
+	return nil
+}
+
+func (m *Role) GetResources() []*Resource {
+	if m != nil {
+		return m.Resources
+	}
+	return nil
+}
+
+// *
+// Metric consists of a name and optionally its value.
+type Metric struct {
+	Name             *string  `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Value            *float64 `protobuf:"fixed64,2,opt,name=value" json:"value,omitempty"`
+	XXX_unrecognized []byte   `json:"-"`
+}
+
+func (m *Metric) Reset()                    { *m = Metric{} }
+func (m *Metric) String() string            { return proto.CompactTextString(m) }
+func (*Metric) ProtoMessage()               {}
+func (*Metric) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{61} }
+
+func (m *Metric) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *Metric) GetValue() float64 {
+	if m != nil && m.Value != nil {
+		return *m.Value
+	}
+	return 0
+}
+
+// *
+// Describes a File.
+type FileInfo struct {
+	// Absolute path to the file.
+	Path *string `protobuf:"bytes,1,req,name=path" json:"path,omitempty"`
+	// Number of hard links.
+	Nlink *int32 `protobuf:"varint,2,opt,name=nlink" json:"nlink,omitempty"`
+	// Total size in bytes.
+	Size *uint64 `protobuf:"varint,3,opt,name=size" json:"size,omitempty"`
+	// Last modification time.
+	Mtime *TimeInfo `protobuf:"bytes,4,opt,name=mtime" json:"mtime,omitempty"`
+	// Represents a file's mode and permission bits. The bits have the same
+	// definition on all systems and is portable.
+	Mode *uint32 `protobuf:"varint,5,opt,name=mode" json:"mode,omitempty"`
+	// User ID of owner.
+	Uid *string `protobuf:"bytes,6,opt,name=uid" json:"uid,omitempty"`
+	// Group ID of owner.
+	Gid              *string `protobuf:"bytes,7,opt,name=gid" json:"gid,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *FileInfo) Reset()                    { *m = FileInfo{} }
+func (m *FileInfo) String() string            { return proto.CompactTextString(m) }
+func (*FileInfo) ProtoMessage()               {}
+func (*FileInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{62} }
+
+func (m *FileInfo) GetPath() string {
+	if m != nil && m.Path != nil {
+		return *m.Path
+	}
+	return ""
+}
+
+func (m *FileInfo) GetNlink() int32 {
+	if m != nil && m.Nlink != nil {
+		return *m.Nlink
+	}
+	return 0
+}
+
+func (m *FileInfo) GetSize() uint64 {
+	if m != nil && m.Size != nil {
+		return *m.Size
+	}
+	return 0
+}
+
+func (m *FileInfo) GetMtime() *TimeInfo {
+	if m != nil {
+		return m.Mtime
+	}
+	return nil
+}
+
+func (m *FileInfo) GetMode() uint32 {
+	if m != nil && m.Mode != nil {
+		return *m.Mode
+	}
+	return 0
+}
+
+func (m *FileInfo) GetUid() string {
+	if m != nil && m.Uid != nil {
+		return *m.Uid
+	}
+	return ""
+}
+
+func (m *FileInfo) GetGid() string {
+	if m != nil && m.Gid != nil {
+		return *m.Gid
+	}
+	return ""
+}
+
 func init() {
-	proto.RegisterEnum("mesosproto.Status", Status_name, Status_value)
-	proto.RegisterEnum("mesosproto.TaskState", TaskState_name, TaskState_value)
-	proto.RegisterEnum("mesosproto.FrameworkInfo_Capability_Type", FrameworkInfo_Capability_Type_name, FrameworkInfo_Capability_Type_value)
-	proto.RegisterEnum("mesosproto.Value_Type", Value_Type_name, Value_Type_value)
-	proto.RegisterEnum("mesosproto.Offer_Operation_Type", Offer_Operation_Type_name, Offer_Operation_Type_value)
-	proto.RegisterEnum("mesosproto.TaskStatus_Source", TaskStatus_Source_name, TaskStatus_Source_value)
-	proto.RegisterEnum("mesosproto.TaskStatus_Reason", TaskStatus_Reason_name, TaskStatus_Reason_value)
-	proto.RegisterEnum("mesosproto.ACL_Entity_Type", ACL_Entity_Type_name, ACL_Entity_Type_value)
-	proto.RegisterEnum("mesosproto.Image_Type", Image_Type_name, Image_Type_value)
-	proto.RegisterEnum("mesosproto.Volume_Mode", Volume_Mode_name, Volume_Mode_value)
-	proto.RegisterEnum("mesosproto.ContainerInfo_Type", ContainerInfo_Type_name, ContainerInfo_Type_value)
-	proto.RegisterEnum("mesosproto.ContainerInfo_DockerInfo_Network", ContainerInfo_DockerInfo_Network_name, ContainerInfo_DockerInfo_Network_value)
-	proto.RegisterEnum("mesosproto.DiscoveryInfo_Visibility", DiscoveryInfo_Visibility_name, DiscoveryInfo_Visibility_value)
+	proto.RegisterType((*FrameworkID)(nil), "mesos.v1.FrameworkID")
+	proto.RegisterType((*OfferID)(nil), "mesos.v1.OfferID")
+	proto.RegisterType((*AgentID)(nil), "mesos.v1.AgentID")
+	proto.RegisterType((*TaskID)(nil), "mesos.v1.TaskID")
+	proto.RegisterType((*ExecutorID)(nil), "mesos.v1.ExecutorID")
+	proto.RegisterType((*ContainerID)(nil), "mesos.v1.ContainerID")
+	proto.RegisterType((*TimeInfo)(nil), "mesos.v1.TimeInfo")
+	proto.RegisterType((*DurationInfo)(nil), "mesos.v1.DurationInfo")
+	proto.RegisterType((*Address)(nil), "mesos.v1.Address")
+	proto.RegisterType((*URL)(nil), "mesos.v1.URL")
+	proto.RegisterType((*Unavailability)(nil), "mesos.v1.Unavailability")
+	proto.RegisterType((*MachineID)(nil), "mesos.v1.MachineID")
+	proto.RegisterType((*MachineInfo)(nil), "mesos.v1.MachineInfo")
+	proto.RegisterType((*FrameworkInfo)(nil), "mesos.v1.FrameworkInfo")
+	proto.RegisterType((*FrameworkInfo_Capability)(nil), "mesos.v1.FrameworkInfo.Capability")
+	proto.RegisterType((*HealthCheck)(nil), "mesos.v1.HealthCheck")
+	proto.RegisterType((*HealthCheck_HTTP)(nil), "mesos.v1.HealthCheck.HTTP")
+	proto.RegisterType((*KillPolicy)(nil), "mesos.v1.KillPolicy")
+	proto.RegisterType((*CommandInfo)(nil), "mesos.v1.CommandInfo")
+	proto.RegisterType((*CommandInfo_URI)(nil), "mesos.v1.CommandInfo.URI")
+	proto.RegisterType((*ExecutorInfo)(nil), "mesos.v1.ExecutorInfo")
+	proto.RegisterType((*MasterInfo)(nil), "mesos.v1.MasterInfo")
+	proto.RegisterType((*AgentInfo)(nil), "mesos.v1.AgentInfo")
+	proto.RegisterType((*Value)(nil), "mesos.v1.Value")
+	proto.RegisterType((*Value_Scalar)(nil), "mesos.v1.Value.Scalar")
+	proto.RegisterType((*Value_Range)(nil), "mesos.v1.Value.Range")
+	proto.RegisterType((*Value_Ranges)(nil), "mesos.v1.Value.Ranges")
+	proto.RegisterType((*Value_Set)(nil), "mesos.v1.Value.Set")
+	proto.RegisterType((*Value_Text)(nil), "mesos.v1.Value.Text")
+	proto.RegisterType((*Attribute)(nil), "mesos.v1.Attribute")
+	proto.RegisterType((*Resource)(nil), "mesos.v1.Resource")
+	proto.RegisterType((*Resource_ReservationInfo)(nil), "mesos.v1.Resource.ReservationInfo")
+	proto.RegisterType((*Resource_DiskInfo)(nil), "mesos.v1.Resource.DiskInfo")
+	proto.RegisterType((*Resource_DiskInfo_Persistence)(nil), "mesos.v1.Resource.DiskInfo.Persistence")
+	proto.RegisterType((*Resource_DiskInfo_Source)(nil), "mesos.v1.Resource.DiskInfo.Source")
+	proto.RegisterType((*Resource_DiskInfo_Source_Path)(nil), "mesos.v1.Resource.DiskInfo.Source.Path")
+	proto.RegisterType((*Resource_DiskInfo_Source_Mount)(nil), "mesos.v1.Resource.DiskInfo.Source.Mount")
+	proto.RegisterType((*Resource_RevocableInfo)(nil), "mesos.v1.Resource.RevocableInfo")
+	proto.RegisterType((*TrafficControlStatistics)(nil), "mesos.v1.TrafficControlStatistics")
+	proto.RegisterType((*IpStatistics)(nil), "mesos.v1.IpStatistics")
+	proto.RegisterType((*IcmpStatistics)(nil), "mesos.v1.IcmpStatistics")
+	proto.RegisterType((*TcpStatistics)(nil), "mesos.v1.TcpStatistics")
+	proto.RegisterType((*UdpStatistics)(nil), "mesos.v1.UdpStatistics")
+	proto.RegisterType((*SNMPStatistics)(nil), "mesos.v1.SNMPStatistics")
+	proto.RegisterType((*ResourceStatistics)(nil), "mesos.v1.ResourceStatistics")
+	proto.RegisterType((*ResourceUsage)(nil), "mesos.v1.ResourceUsage")
+	proto.RegisterType((*ResourceUsage_Executor)(nil), "mesos.v1.ResourceUsage.Executor")
+	proto.RegisterType((*ResourceUsage_Executor_Task)(nil), "mesos.v1.ResourceUsage.Executor.Task")
+	proto.RegisterType((*PerfStatistics)(nil), "mesos.v1.PerfStatistics")
+	proto.RegisterType((*Request)(nil), "mesos.v1.Request")
+	proto.RegisterType((*Offer)(nil), "mesos.v1.Offer")
+	proto.RegisterType((*Offer_Operation)(nil), "mesos.v1.Offer.Operation")
+	proto.RegisterType((*Offer_Operation_Launch)(nil), "mesos.v1.Offer.Operation.Launch")
+	proto.RegisterType((*Offer_Operation_Reserve)(nil), "mesos.v1.Offer.Operation.Reserve")
+	proto.RegisterType((*Offer_Operation_Unreserve)(nil), "mesos.v1.Offer.Operation.Unreserve")
+	proto.RegisterType((*Offer_Operation_Create)(nil), "mesos.v1.Offer.Operation.Create")
+	proto.RegisterType((*Offer_Operation_Destroy)(nil), "mesos.v1.Offer.Operation.Destroy")
+	proto.RegisterType((*InverseOffer)(nil), "mesos.v1.InverseOffer")
+	proto.RegisterType((*TaskInfo)(nil), "mesos.v1.TaskInfo")
+	proto.RegisterType((*Task)(nil), "mesos.v1.Task")
+	proto.RegisterType((*TaskStatus)(nil), "mesos.v1.TaskStatus")
+	proto.RegisterType((*Filters)(nil), "mesos.v1.Filters")
+	proto.RegisterType((*Environment)(nil), "mesos.v1.Environment")
+	proto.RegisterType((*Environment_Variable)(nil), "mesos.v1.Environment.Variable")
+	proto.RegisterType((*Parameter)(nil), "mesos.v1.Parameter")
+	proto.RegisterType((*Parameters)(nil), "mesos.v1.Parameters")
+	proto.RegisterType((*Credential)(nil), "mesos.v1.Credential")
+	proto.RegisterType((*Credentials)(nil), "mesos.v1.Credentials")
+	proto.RegisterType((*RateLimit)(nil), "mesos.v1.RateLimit")
+	proto.RegisterType((*RateLimits)(nil), "mesos.v1.RateLimits")
+	proto.RegisterType((*Image)(nil), "mesos.v1.Image")
+	proto.RegisterType((*Image_Appc)(nil), "mesos.v1.Image.Appc")
+	proto.RegisterType((*Image_Docker)(nil), "mesos.v1.Image.Docker")
+	proto.RegisterType((*Volume)(nil), "mesos.v1.Volume")
+	proto.RegisterType((*Volume_Source)(nil), "mesos.v1.Volume.Source")
+	proto.RegisterType((*Volume_Source_DockerVolume)(nil), "mesos.v1.Volume.Source.DockerVolume")
+	proto.RegisterType((*NetworkInfo)(nil), "mesos.v1.NetworkInfo")
+	proto.RegisterType((*NetworkInfo_IPAddress)(nil), "mesos.v1.NetworkInfo.IPAddress")
+	proto.RegisterType((*ContainerInfo)(nil), "mesos.v1.ContainerInfo")
+	proto.RegisterType((*ContainerInfo_DockerInfo)(nil), "mesos.v1.ContainerInfo.DockerInfo")
+	proto.RegisterType((*ContainerInfo_DockerInfo_PortMapping)(nil), "mesos.v1.ContainerInfo.DockerInfo.PortMapping")
+	proto.RegisterType((*ContainerInfo_MesosInfo)(nil), "mesos.v1.ContainerInfo.MesosInfo")
+	proto.RegisterType((*ContainerStatus)(nil), "mesos.v1.ContainerStatus")
+	proto.RegisterType((*CgroupInfo)(nil), "mesos.v1.CgroupInfo")
+	proto.RegisterType((*CgroupInfo_NetCls)(nil), "mesos.v1.CgroupInfo.NetCls")
+	proto.RegisterType((*Labels)(nil), "mesos.v1.Labels")
+	proto.RegisterType((*Label)(nil), "mesos.v1.Label")
+	proto.RegisterType((*Port)(nil), "mesos.v1.Port")
+	proto.RegisterType((*Ports)(nil), "mesos.v1.Ports")
+	proto.RegisterType((*DiscoveryInfo)(nil), "mesos.v1.DiscoveryInfo")
+	proto.RegisterType((*WeightInfo)(nil), "mesos.v1.WeightInfo")
+	proto.RegisterType((*VersionInfo)(nil), "mesos.v1.VersionInfo")
+	proto.RegisterType((*Flag)(nil), "mesos.v1.Flag")
+	proto.RegisterType((*Role)(nil), "mesos.v1.Role")
+	proto.RegisterType((*Metric)(nil), "mesos.v1.Metric")
+	proto.RegisterType((*FileInfo)(nil), "mesos.v1.FileInfo")
+	proto.RegisterEnum("mesos.v1.Status", Status_name, Status_value)
+	proto.RegisterEnum("mesos.v1.TaskState", TaskState_name, TaskState_value)
+	proto.RegisterEnum("mesos.v1.MachineInfo_Mode", MachineInfo_Mode_name, MachineInfo_Mode_value)
+	proto.RegisterEnum("mesos.v1.FrameworkInfo_Capability_Type", FrameworkInfo_Capability_Type_name, FrameworkInfo_Capability_Type_value)
+	proto.RegisterEnum("mesos.v1.Value_Type", Value_Type_name, Value_Type_value)
+	proto.RegisterEnum("mesos.v1.Resource_DiskInfo_Source_Type", Resource_DiskInfo_Source_Type_name, Resource_DiskInfo_Source_Type_value)
+	proto.RegisterEnum("mesos.v1.Offer_Operation_Type", Offer_Operation_Type_name, Offer_Operation_Type_value)
+	proto.RegisterEnum("mesos.v1.TaskStatus_Source", TaskStatus_Source_name, TaskStatus_Source_value)
+	proto.RegisterEnum("mesos.v1.TaskStatus_Reason", TaskStatus_Reason_name, TaskStatus_Reason_value)
+	proto.RegisterEnum("mesos.v1.Image_Type", Image_Type_name, Image_Type_value)
+	proto.RegisterEnum("mesos.v1.Volume_Mode", Volume_Mode_name, Volume_Mode_value)
+	proto.RegisterEnum("mesos.v1.Volume_Source_Type", Volume_Source_Type_name, Volume_Source_Type_value)
+	proto.RegisterEnum("mesos.v1.NetworkInfo_Protocol", NetworkInfo_Protocol_name, NetworkInfo_Protocol_value)
+	proto.RegisterEnum("mesos.v1.ContainerInfo_Type", ContainerInfo_Type_name, ContainerInfo_Type_value)
+	proto.RegisterEnum("mesos.v1.ContainerInfo_DockerInfo_Network", ContainerInfo_DockerInfo_Network_name, ContainerInfo_DockerInfo_Network_value)
+	proto.RegisterEnum("mesos.v1.DiscoveryInfo_Visibility", DiscoveryInfo_Visibility_name, DiscoveryInfo_Visibility_value)
+}
+
+func init() { proto.RegisterFile("mesos.proto", fileDescriptor0) }
+
+var fileDescriptor0 = []byte{
+	// 5922 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xc4, 0x7b, 0xcd, 0x6f, 0x1b, 0x4b,
+	0x72, 0xf8, 0xf2, 0x9b, 0x2c, 0x8a, 0x12, 0x4d, 0x49, 0x36, 0x4d, 0x7f, 0x8f, 0xdf, 0xf3, 0xd7,
+	0xf3, 0x6a, 0x65, 0xbf, 0xa7, 0xfd, 0xf0, 0xef, 0x17, 0x20, 0xb4, 0x44, 0xdb, 0x5c, 0x4b, 0xa4,
+	0x96, 0xa2, 0xfc, 0x76, 0x17, 0x09, 0x88, 0x11, 0x39, 0xa2, 0x26, 0x26, 0x67, 0xb8, 0x33, 0x43,
+	0xf9, 0x39, 0x41, 0x80, 0xdc, 0x72, 0xd9, 0x04, 0xb9, 0x24, 0xa7, 0x00, 0x49, 0x6e, 0x39, 0xe4,
+	0x90, 0x17, 0x20, 0x87, 0x00, 0x39, 0xe4, 0x18, 0xe4, 0xba, 0x39, 0xe6, 0xaf, 0xd8, 0x24, 0x08,
+	0x02, 0x64, 0x81, 0x54, 0x55, 0x77, 0xcf, 0xf4, 0xf0, 0x43, 0x4f, 0x41, 0x0e, 0x39, 0x49, 0xac,
+	0xae, 0xee, 0xae, 0xaf, 0xae, 0xaa, 0xae, 0xae, 0x81, 0xe2, 0xd8, 0xf2, 0x5d, 0x7f, 0x6b, 0xe2,
+	0xb9, 0x81, 0x5b, 0xc9, 0x8b, 0x1f, 0xe7, 0xcf, 0x8c, 0x9b, 0x50, 0x7c, 0xe5, 0x99, 0x63, 0xeb,
+	0x83, 0xeb, 0xbd, 0x6f, 0xee, 0x55, 0x4a, 0x90, 0x39, 0x37, 0x47, 0x53, 0xab, 0x9a, 0xb8, 0x9b,
+	0x7c, 0x54, 0x30, 0xaa, 0x90, 0x6b, 0x9f, 0x9e, 0x5a, 0xde, 0xc2, 0x91, 0xfa, 0xd0, 0x72, 0x82,
+	0xf9, 0x91, 0x6b, 0x90, 0xed, 0x9a, 0xfe, 0x82, 0xc5, 0x6e, 0x00, 0x34, 0xbe, 0xb2, 0xfa, 0xd3,
+	0xc0, 0x5d, 0xb0, 0x1e, 0xd2, 0xb1, 0xeb, 0x3a, 0x81, 0x69, 0x3b, 0x8b, 0x76, 0xbb, 0x03, 0xf9,
+	0xae, 0x3d, 0xb6, 0x9a, 0xce, 0xa9, 0x5b, 0x59, 0x87, 0xa2, 0x63, 0x3a, 0xae, 0x6f, 0xf5, 0x5d,
+	0x67, 0xe0, 0x33, 0x42, 0xca, 0xb8, 0x0f, 0x2b, 0x7b, 0x53, 0xcf, 0x0c, 0x6c, 0xd7, 0x59, 0x8e,
+	0xb4, 0x83, 0x34, 0x0f, 0x06, 0x9e, 0xe5, 0xfb, 0x95, 0x32, 0xe4, 0xcf, 0x5c, 0x3f, 0x70, 0x90,
+	0x73, 0x1c, 0x4c, 0x3c, 0x2a, 0x54, 0x00, 0x92, 0xf6, 0xa4, 0x9a, 0xe4, 0xff, 0x57, 0x20, 0x3d,
+	0x71, 0xbd, 0xa0, 0x9a, 0xc2, 0x69, 0x19, 0xe3, 0x77, 0x21, 0x75, 0xdc, 0xd9, 0xaf, 0xac, 0x42,
+	0xd6, 0xef, 0x9f, 0x59, 0x63, 0x49, 0x53, 0xc5, 0x80, 0x9c, 0x29, 0x56, 0xc3, 0x59, 0xc9, 0x47,
+	0xc5, 0xe7, 0x57, 0xb6, 0x94, 0x54, 0xb7, 0xd4, 0x36, 0xb4, 0x90, 0x19, 0x9c, 0xe1, 0x42, 0x09,
+	0x9e, 0x91, 0xf9, 0xd9, 0xd4, 0xf2, 0x3e, 0x56, 0xd3, 0x77, 0x53, 0x88, 0xbf, 0x1e, 0xe1, 0x1f,
+	0x9a, 0xa4, 0x83, 0xc0, 0xf2, 0x88, 0xb0, 0x53, 0xcf, 0x1c, 0x8e, 0x51, 0xb4, 0xd5, 0x0c, 0xcd,
+	0x32, 0x7e, 0x13, 0x56, 0x8f, 0x1d, 0xf3, 0xdc, 0xb4, 0x47, 0xe6, 0x89, 0x3d, 0xb2, 0x83, 0x8f,
+	0x95, 0x7b, 0x90, 0xf1, 0x03, 0x13, 0xe9, 0x4b, 0xf0, 0xbe, 0x95, 0x68, 0x9d, 0x50, 0x48, 0x8f,
+	0x20, 0x3f, 0x90, 0xf2, 0x60, 0x9e, 0x8a, 0xcf, 0xaf, 0x46, 0x58, 0xba, 0xa4, 0x8c, 0xc7, 0x50,
+	0x38, 0x30, 0xfb, 0x67, 0x28, 0x77, 0x14, 0xfb, 0x85, 0x62, 0x31, 0xfe, 0x26, 0x01, 0x45, 0x85,
+	0x4b, 0x9b, 0xdc, 0xc1, 0xb1, 0x81, 0x24, 0x42, 0x63, 0x26, 0x5a, 0xee, 0x11, 0xa4, 0xc7, 0xee,
+	0xc0, 0xe2, 0xe9, 0xab, 0xcf, 0x6b, 0xf3, 0x28, 0xb8, 0xca, 0xd6, 0x01, 0x62, 0x54, 0xb6, 0x61,
+	0x75, 0x1a, 0x63, 0x92, 0x45, 0x56, 0x7c, 0x5e, 0x8d, 0xe6, 0xc4, 0x85, 0x60, 0x3c, 0x80, 0x34,
+	0xcf, 0xcc, 0x42, 0xf2, 0xf8, 0xb0, 0x9c, 0x40, 0x51, 0xe7, 0xf7, 0x3a, 0xf5, 0x66, 0xab, 0xd9,
+	0x7a, 0x5d, 0x4e, 0x56, 0xf2, 0x90, 0xde, 0x6b, 0x7f, 0xd9, 0x2a, 0xa7, 0x8c, 0x7f, 0x4a, 0x41,
+	0x29, 0xb2, 0x70, 0x22, 0x1b, 0x95, 0x32, 0xf5, 0x2d, 0x4f, 0xaa, 0x11, 0x7f, 0x31, 0xbb, 0x49,
+	0xfe, 0x75, 0x8f, 0x59, 0x12, 0x7b, 0x6f, 0x46, 0x7b, 0xeb, 0x47, 0xe4, 0x06, 0x94, 0x4f, 0x91,
+	0x0e, 0xf7, 0xdc, 0xf2, 0x7a, 0x01, 0xca, 0xdb, 0x9d, 0x06, 0xa8, 0xd0, 0xc4, 0xa3, 0xc4, 0x8b,
+	0xc4, 0x76, 0xe5, 0x3a, 0x00, 0xda, 0x48, 0xff, 0xfd, 0xc4, 0xb5, 0xa5, 0x02, 0xf3, 0x2f, 0x32,
+	0xa7, 0xe6, 0xc8, 0xb7, 0x2a, 0x6b, 0x90, 0xf6, 0xdc, 0x91, 0x55, 0xcd, 0x92, 0x2c, 0x5f, 0x24,
+	0x9e, 0xc4, 0x84, 0x9d, 0x63, 0x61, 0x5f, 0x81, 0xc2, 0xc4, 0xb3, 0x9d, 0xbe, 0x3d, 0x31, 0x47,
+	0xd5, 0xbc, 0x02, 0x7d, 0xb0, 0x4e, 0xa6, 0x76, 0x6f, 0xea, 0x8d, 0xaa, 0x05, 0x06, 0x7d, 0x1f,
+	0x56, 0xfa, 0xe6, 0x44, 0xc8, 0xc1, 0xb6, 0xfc, 0x2a, 0xb0, 0x35, 0x19, 0x8b, 0xa8, 0x25, 0xf9,
+	0xee, 0x2a, 0xdc, 0x8f, 0x95, 0xbb, 0x90, 0x45, 0xf9, 0x59, 0x23, 0xbf, 0x5a, 0x64, 0x0e, 0xcb,
+	0xd1, 0x9c, 0x7d, 0x86, 0xd7, 0xfe, 0x34, 0x01, 0xa0, 0x4d, 0xd8, 0x81, 0x74, 0xf0, 0x71, 0x22,
+	0x6c, 0x61, 0xf5, 0xf9, 0xc3, 0x6f, 0xde, 0x62, 0xab, 0x8b, 0xe8, 0xc6, 0x97, 0x90, 0xa6, 0xbf,
+	0x95, 0x22, 0xe4, 0x8e, 0x5b, 0x6f, 0x5b, 0xa4, 0x88, 0x6f, 0x55, 0xae, 0xc1, 0x7a, 0xa7, 0xf1,
+	0xae, 0xbd, 0x5b, 0x7f, 0xb9, 0xdf, 0xe8, 0x75, 0x1a, 0x47, 0xed, 0xe3, 0xce, 0x6e, 0xe3, 0x08,
+	0x35, 0x77, 0x15, 0x2a, 0xdd, 0xfa, 0xd1, 0xdb, 0xde, 0xdb, 0xe6, 0xfe, 0x3e, 0x6a, 0xaf, 0x77,
+	0xd4, 0xad, 0x77, 0x1b, 0xa8, 0xc3, 0x2b, 0x50, 0x7a, 0x7d, 0x78, 0xac, 0xa1, 0xa6, 0x8c, 0xaf,
+	0x93, 0x50, 0x7c, 0x63, 0x99, 0xa3, 0xe0, 0x6c, 0x97, 0xa4, 0x4c, 0x06, 0x76, 0x16, 0x04, 0x13,
+	0xa6, 0xaf, 0xa8, 0x1b, 0x98, 0x86, 0xb4, 0xf5, 0xa6, 0xdb, 0x3d, 0x44, 0xc5, 0x94, 0x06, 0xd6,
+	0xc8, 0xfc, 0xd8, 0x53, 0x2e, 0x21, 0xc9, 0x2a, 0x4b, 0x3e, 0xdb, 0xa9, 0xdc, 0x84, 0x32, 0x2a,
+	0xcb, 0xf2, 0xd0, 0xe1, 0x84, 0xa3, 0x29, 0x39, 0xba, 0x8d, 0xea, 0x5e, 0x93, 0x5a, 0x0e, 0x07,
+	0x85, 0xb6, 0x93, 0xcf, 0xb7, 0xf1, 0x04, 0x6c, 0x20, 0xc8, 0x27, 0xa7, 0x66, 0x9f, 0x5b, 0x3d,
+	0xb2, 0x8b, 0x29, 0x1e, 0x7c, 0x56, 0x7c, 0xe9, 0x45, 0xe2, 0x73, 0x94, 0xf8, 0xc6, 0xd0, 0x33,
+	0xfb, 0x56, 0x6f, 0x62, 0x79, 0xb6, 0x3b, 0x08, 0x97, 0xc8, 0x86, 0xeb, 0x3f, 0x80, 0x5c, 0xdf,
+	0x1d, 0x8f, 0x4d, 0x67, 0xc0, 0x46, 0x10, 0x33, 0xbb, 0x5d, 0x31, 0x40, 0x32, 0xae, 0x7d, 0x0f,
+	0xd2, 0xcc, 0x88, 0xf2, 0x4d, 0x64, 0xbd, 0x25, 0x32, 0x2a, 0x76, 0x30, 0x49, 0x61, 0x54, 0xdf,
+	0x21, 0xa3, 0x42, 0xdf, 0x10, 0xa0, 0x81, 0xfb, 0xec, 0x66, 0x4a, 0xc6, 0x0b, 0x80, 0xb7, 0xf6,
+	0x68, 0x74, 0xe8, 0x8e, 0xec, 0xfe, 0xc7, 0xca, 0x53, 0x58, 0xd1, 0x09, 0x92, 0x92, 0x5b, 0xe6,
+	0x1c, 0x7e, 0x9e, 0x24, 0xb7, 0x1c, 0x12, 0x51, 0x79, 0x88, 0x47, 0xc7, 0xb3, 0xc9, 0x9f, 0x92,
+	0xc9, 0x5d, 0x5f, 0x48, 0xe9, 0xd6, 0x71, 0xa7, 0x59, 0x79, 0x02, 0x45, 0xcb, 0x39, 0xb7, 0x3d,
+	0xd7, 0x61, 0x4f, 0x96, 0x9c, 0xe5, 0xac, 0x11, 0x0d, 0xa2, 0xaf, 0xce, 0xf8, 0x67, 0xd6, 0x68,
+	0xc4, 0x42, 0xc9, 0xbf, 0x48, 0x07, 0xde, 0xd4, 0x8a, 0x02, 0x40, 0x4a, 0x1d, 0x03, 0xd3, 0x1b,
+	0x4e, 0x09, 0xdf, 0x47, 0x39, 0xa5, 0xc4, 0xc1, 0xe5, 0x63, 0xcc, 0x5e, 0xb2, 0xd6, 0x27, 0x27,
+	0xdd, 0x9c, 0x89, 0x1b, 0x15, 0x74, 0x5f, 0x16, 0x87, 0x1c, 0xf3, 0x64, 0x24, 0xdc, 0x50, 0xbe,
+	0xb2, 0x09, 0x39, 0xeb, 0xab, 0x00, 0x65, 0x10, 0xf0, 0xda, 0xda, 0x86, 0x7d, 0xf4, 0x4a, 0x16,
+	0x6b, 0x37, 0x4f, 0x01, 0x04, 0x55, 0x3e, 0x41, 0xad, 0x9f, 0xda, 0x38, 0x55, 0xb8, 0xe2, 0x3f,
+	0x49, 0xc1, 0x4a, 0x18, 0xc2, 0x48, 0x1e, 0x8f, 0x91, 0x4d, 0xf9, 0xbb, 0x17, 0xba, 0xc2, 0x0d,
+	0x8d, 0xcd, 0x28, 0xde, 0x7d, 0x06, 0x2b, 0xa7, 0xea, 0xd0, 0x10, 0x6e, 0xfe, 0x22, 0x1f, 0x13,
+	0x33, 0x8a, 0xe4, 0x52, 0xa3, 0x40, 0x31, 0x17, 0xfa, 0x2a, 0x6a, 0xca, 0x33, 0x7d, 0x4d, 0xc7,
+	0x54, 0x01, 0x95, 0x70, 0x3f, 0x85, 0x02, 0x9a, 0xa6, 0x3b, 0xf5, 0xfa, 0x6c, 0xa0, 0xa9, 0x78,
+	0xe4, 0xe8, 0xc8, 0xa1, 0xd0, 0x1f, 0x0a, 0x5f, 0x53, 0xc1, 0xa0, 0xc7, 0x70, 0xf4, 0x32, 0xf8,
+	0xfb, 0x65, 0xb2, 0x4a, 0x9e, 0x36, 0x3d, 0x30, 0x03, 0x93, 0x05, 0xb5, 0x42, 0x24, 0x0c, 0x6c,
+	0xbf, 0x4f, 0xee, 0xf0, 0x63, 0x75, 0x65, 0x96, 0x84, 0x3d, 0x35, 0xc4, 0x24, 0xec, 0xc0, 0xa6,
+	0x7f, 0x36, 0x0d, 0x06, 0xee, 0x07, 0xa7, 0x17, 0xb3, 0xc2, 0xd2, 0x45, 0x56, 0xa8, 0xb9, 0xad,
+	0xd5, 0xc5, 0x6e, 0xcb, 0xf8, 0x39, 0xba, 0xad, 0x03, 0xd3, 0x0f, 0x24, 0xab, 0x10, 0x06, 0xa6,
+	0x28, 0x80, 0xd1, 0x69, 0xa9, 0x68, 0x71, 0xbd, 0xf4, 0x22, 0xbd, 0xb3, 0xbd, 0xb3, 0x8d, 0x3e,
+	0x2a, 0x35, 0x41, 0xe4, 0x34, 0xb3, 0xab, 0xbb, 0x64, 0x56, 0x39, 0x1e, 0xb0, 0x1c, 0x92, 0xef,
+	0x53, 0x1c, 0xcd, 0xca, 0x20, 0x1e, 0x86, 0x7d, 0x71, 0x5e, 0xe7, 0xc3, 0xbe, 0xf1, 0xe7, 0x09,
+	0x28, 0x88, 0xec, 0x88, 0xa8, 0x89, 0x07, 0x55, 0x61, 0x96, 0x82, 0x0e, 0xb2, 0x81, 0x0c, 0xd3,
+	0xf1, 0x2c, 0xae, 0x9e, 0xd4, 0x52, 0xf5, 0x3c, 0x04, 0x30, 0x83, 0xc0, 0xb3, 0x4f, 0xa6, 0x41,
+	0xa8, 0x46, 0x2d, 0xf6, 0xd6, 0xd5, 0x58, 0xe5, 0x16, 0xcb, 0x20, 0x3b, 0x47, 0xa2, 0x48, 0xda,
+	0x8c, 0x3f, 0x4c, 0x41, 0xe6, 0x1d, 0x9d, 0x14, 0x64, 0x48, 0xf9, 0xf8, 0x24, 0xfa, 0x78, 0xcd,
+	0x78, 0x79, 0x98, 0x1d, 0x3a, 0xda, 0x23, 0xe6, 0x3e, 0xe6, 0xc8, 0xf4, 0xe6, 0x93, 0x09, 0x81,
+	0x75, 0xc4, 0xa3, 0x84, 0xe7, 0x99, 0xce, 0xd0, 0xf2, 0x65, 0x08, 0x9d, 0xc3, 0xeb, 0xf0, 0x28,
+	0x6a, 0x34, 0xe5, 0x5b, 0x22, 0x6c, 0xc6, 0xc8, 0x97, 0x8b, 0x59, 0x01, 0x53, 0x85, 0xc7, 0x94,
+	0xb5, 0x50, 0x5c, 0x40, 0x15, 0x8e, 0xd5, 0x30, 0xd3, 0x94, 0xfb, 0xc6, 0x8e, 0x7d, 0xa2, 0x76,
+	0x1f, 0x32, 0xbc, 0x11, 0xc1, 0x4f, 0xac, 0xa1, 0xed, 0x30, 0x3c, 0x4d, 0xba, 0xb6, 0xf0, 0x48,
+	0x91, 0x31, 0xa4, 0x6b, 0x5b, 0x90, 0x95, 0xd4, 0x7c, 0x02, 0x19, 0xa6, 0x5a, 0xba, 0xb5, 0xcd,
+	0x85, 0x44, 0xd7, 0xd6, 0x21, 0x45, 0x84, 0xa1, 0xf5, 0xdb, 0x81, 0x35, 0x66, 0xdc, 0x42, 0x6d,
+	0x13, 0x23, 0x1d, 0x92, 0x32, 0x9b, 0xaf, 0x3e, 0x93, 0x01, 0x10, 0x90, 0xc2, 0xdd, 0xfa, 0x7e,
+	0xbd, 0x83, 0xf1, 0x0f, 0xff, 0xef, 0xd4, 0x5b, 0xaf, 0x39, 0xe4, 0xe5, 0x70, 0xad, 0x46, 0x57,
+	0xe4, 0x29, 0xdd, 0xc6, 0x8f, 0xbb, 0x18, 0xda, 0x7e, 0x41, 0x36, 0x13, 0x6a, 0x4f, 0x9d, 0x42,
+	0x95, 0x6a, 0x0a, 0x15, 0x25, 0x2f, 0xa5, 0xa2, 0xd4, 0x25, 0x55, 0x94, 0xbe, 0x8c, 0x8a, 0xb2,
+	0xff, 0x2b, 0x15, 0x19, 0xff, 0x95, 0x85, 0xfc, 0x9c, 0x6b, 0xf9, 0x3f, 0x67, 0x2a, 0xb3, 0x9c,
+	0xa9, 0xb9, 0x2c, 0xed, 0x7b, 0x50, 0xc4, 0x73, 0x49, 0xd9, 0x01, 0x27, 0xd3, 0xc2, 0x6d, 0x1b,
+	0xf3, 0x27, 0x93, 0xfe, 0x51, 0x58, 0x32, 0x36, 0xa4, 0xd1, 0x31, 0xbe, 0x97, 0x5e, 0xe2, 0xc6,
+	0x82, 0x19, 0xe8, 0x1c, 0x45, 0x46, 0xfa, 0x39, 0x9d, 0xfd, 0x73, 0xb7, 0xcf, 0x51, 0xaa, 0xc0,
+	0xf8, 0x77, 0x17, 0xee, 0x20, 0x71, 0x38, 0x21, 0x78, 0x05, 0x6b, 0xb3, 0x5b, 0xc6, 0xf2, 0x47,
+	0x91, 0xbf, 0x47, 0xbe, 0x33, 0xb9, 0x24, 0xe5, 0xfb, 0xc7, 0x14, 0x66, 0xce, 0x8a, 0x92, 0xff,
+	0x0f, 0xc5, 0x09, 0xb9, 0x3b, 0x74, 0xa5, 0x4e, 0xdf, 0x92, 0xd9, 0xc1, 0xc3, 0x0b, 0x68, 0xdf,
+	0x3a, 0x8c, 0xd0, 0x69, 0xb3, 0x73, 0x77, 0x34, 0x1d, 0x5b, 0xf3, 0x9b, 0xbd, 0x63, 0x78, 0xe5,
+	0x79, 0x18, 0x4f, 0x52, 0x4b, 0x05, 0x19, 0x2e, 0x7d, 0xc4, 0xbf, 0x6b, 0x4f, 0xa1, 0xa8, 0x6f,
+	0xa2, 0x3b, 0xf7, 0x18, 0xc3, 0x9c, 0x03, 0xd5, 0xfe, 0x33, 0x81, 0x67, 0x4e, 0xd8, 0xdb, 0x4e,
+	0xcc, 0xb3, 0x3d, 0xfc, 0xe6, 0xad, 0x84, 0xd1, 0xed, 0x68, 0x39, 0x55, 0xf1, 0x52, 0xd3, 0x0e,
+	0x11, 0x1d, 0x0d, 0x25, 0x33, 0x76, 0xa7, 0x4e, 0x20, 0x39, 0x7b, 0x74, 0x89, 0x79, 0x07, 0x84,
+	0x5f, 0xdb, 0x80, 0x34, 0x2f, 0xb0, 0x42, 0xa6, 0xe7, 0x8a, 0xcc, 0x8e, 0x3c, 0x4b, 0x86, 0x87,
+	0xe3, 0x60, 0xbc, 0x44, 0x0b, 0xcf, 0x82, 0x8e, 0xe3, 0xb0, 0xde, 0x7d, 0x83, 0xbe, 0xa4, 0x80,
+	0x88, 0xed, 0xe3, 0x16, 0x7a, 0x93, 0xda, 0x1a, 0x94, 0x62, 0x36, 0x62, 0xfc, 0x7d, 0x02, 0xaa,
+	0x5d, 0xcf, 0x3c, 0x3d, 0xb5, 0xfb, 0x94, 0x0c, 0xa0, 0x65, 0x1f, 0x61, 0x72, 0x88, 0x92, 0xb4,
+	0xfb, 0x7e, 0x4c, 0x90, 0x18, 0xe6, 0x4e, 0xcc, 0xfe, 0xfb, 0x91, 0x3b, 0x64, 0xb6, 0xd3, 0xec,
+	0x39, 0x3f, 0x06, 0xd2, 0x91, 0xf3, 0xcf, 0x81, 0xe7, 0x4e, 0xc4, 0xf9, 0x4a, 0x53, 0x5e, 0x45,
+	0x51, 0x7d, 0x64, 0x8f, 0xed, 0x40, 0x64, 0xbb, 0x69, 0x5a, 0x62, 0x82, 0x4b, 0x58, 0x81, 0xc8,
+	0x6e, 0xd3, 0x44, 0xf8, 0xcf, 0x46, 0x96, 0xc3, 0x07, 0x80, 0x87, 0x31, 0xa4, 0x5b, 0x27, 0xb8,
+	0x46, 0x5e, 0x07, 0x4c, 0x10, 0x50, 0x60, 0x00, 0xc6, 0x49, 0xcf, 0xc2, 0x0b, 0xf2, 0x94, 0xef,
+	0x34, 0x08, 0x31, 0xfe, 0x18, 0xf3, 0xad, 0xe6, 0x44, 0x23, 0x19, 0xf7, 0x7d, 0xe5, 0x7a, 0x1f,
+	0x4c, 0x6f, 0x60, 0x3b, 0x43, 0xb6, 0xce, 0x14, 0xc1, 0xf6, 0xac, 0x53, 0x73, 0x3a, 0x0a, 0xba,
+	0xdd, 0x7d, 0xa6, 0x9e, 0x61, 0x4d, 0xa7, 0x63, 0xf5, 0x2d, 0xcc, 0xca, 0x05, 0x0b, 0x29, 0xca,
+	0xe8, 0x9a, 0xce, 0x9b, 0x81, 0xd7, 0xf0, 0x3c, 0xd7, 0x13, 0x8c, 0xa4, 0x2a, 0x1b, 0xb8, 0x81,
+	0x43, 0x61, 0x5b, 0x42, 0x33, 0x0c, 0xdd, 0xc4, 0x2b, 0x23, 0x6e, 0xb3, 0x87, 0x59, 0x0e, 0xa6,
+	0x29, 0x63, 0xc1, 0x50, 0x0a, 0x6f, 0x30, 0x6b, 0x4d, 0xe7, 0xd8, 0x79, 0xef, 0x60, 0xfe, 0x72,
+	0x48, 0x75, 0x14, 0x91, 0x02, 0xc8, 0xed, 0x28, 0xd5, 0x41, 0xc2, 0x04, 0x7b, 0x0a, 0x66, 0x8d,
+	0x6c, 0x4a, 0x1f, 0x98, 0x43, 0x26, 0xa1, 0x3d, 0x0d, 0x3a, 0xc4, 0xa4, 0x1f, 0x08, 0x26, 0x15,
+	0x30, 0x9c, 0x5d, 0xd4, 0x80, 0x2d, 0xb7, 0xe3, 0x72, 0x9c, 0x5f, 0x51, 0xc4, 0x76, 0x2c, 0xd3,
+	0x1f, 0x77, 0xe5, 0xad, 0xb3, 0xa4, 0x36, 0x62, 0x28, 0x2e, 0x3b, 0x10, 0x19, 0x52, 0x8a, 0x44,
+	0xc9, 0xb0, 0xf6, 0x5b, 0xbf, 0xba, 0x16, 0xc3, 0x7a, 0x85, 0x57, 0x14, 0xbf, 0x5a, 0x66, 0x18,
+	0x6a, 0x00, 0x93, 0xce, 0x21, 0x21, 0x5d, 0x61, 0x00, 0x1e, 0x27, 0x02, 0x08, 0x9c, 0x8a, 0x22,
+	0x84, 0x40, 0xbb, 0x9e, 0x65, 0x12, 0x21, 0xeb, 0x04, 0x34, 0x7e, 0x91, 0x86, 0xd5, 0x66, 0x7f,
+	0xac, 0x6b, 0x66, 0x15, 0xb2, 0x4d, 0xe7, 0xc0, 0x1f, 0xfa, 0x52, 0x2b, 0x48, 0x41, 0xd3, 0x91,
+	0x42, 0x4d, 0x46, 0xa2, 0xde, 0xf5, 0xa7, 0x63, 0x09, 0x15, 0x5a, 0xb9, 0x8a, 0x2b, 0xa1, 0x98,
+	0xfc, 0xe0, 0xd8, 0xc1, 0x2d, 0xfa, 0x67, 0x4a, 0x31, 0xac, 0x2d, 0x62, 0xb4, 0xf1, 0x55, 0x7f,
+	0xa0, 0xf4, 0xc2, 0xc0, 0x43, 0xd3, 0x1b, 0xa3, 0xf4, 0x4f, 0x94, 0x56, 0x78, 0xdd, 0x23, 0xaf,
+	0xff, 0xa3, 0x29, 0xba, 0x87, 0x33, 0xa5, 0x12, 0x46, 0xed, 0x58, 0x03, 0xdb, 0xb3, 0xfa, 0x81,
+	0xd2, 0x09, 0x32, 0x8c, 0x44, 0xf5, 0x31, 0x1b, 0x93, 0x0a, 0x61, 0x25, 0x11, 0xa0, 0x63, 0x4d,
+	0x94, 0x3e, 0x78, 0x3d, 0xda, 0x19, 0xef, 0x51, 0xe3, 0x89, 0x52, 0x08, 0xeb, 0x3e, 0x84, 0x32,
+	0xfa, 0x4a, 0xb4, 0x11, 0x59, 0x10, 0xe6, 0x9f, 0xef, 0x7d, 0xa9, 0x13, 0xe6, 0x4a, 0x01, 0x19,
+	0x79, 0x55, 0x11, 0x80, 0x6a, 0x65, 0x31, 0xad, 0x29, 0x89, 0x23, 0x40, 0x4a, 0xa4, 0xac, 0x76,
+	0x22, 0x7b, 0xd0, 0x45, 0x72, 0x45, 0x11, 0x86, 0x03, 0x91, 0x4c, 0x2a, 0x1a, 0x34, 0x12, 0xca,
+	0xba, 0xb2, 0x60, 0x84, 0x6a, 0x52, 0xd9, 0xd0, 0x90, 0x23, 0xb1, 0x6c, 0x2a, 0x5d, 0x11, 0x11,
+	0x2c, 0x97, 0xab, 0x9a, 0xf9, 0x85, 0x82, 0xb9, 0xa6, 0xad, 0xa9, 0x49, 0xa6, 0xca, 0xe0, 0x2a,
+	0x94, 0x75, 0x30, 0x4f, 0xb8, 0xae, 0xed, 0x16, 0xc9, 0xa6, 0xa6, 0xf1, 0x17, 0x13, 0xce, 0x0d,
+	0xb6, 0xaa, 0xbf, 0x4a, 0x42, 0xa9, 0xdb, 0xd7, 0x8d, 0x8a, 0x0c, 0x3e, 0x70, 0xeb, 0xa3, 0xa1,
+	0xeb, 0xd9, 0xc1, 0xd9, 0x58, 0x9a, 0x16, 0x9a, 0x1a, 0x42, 0x0f, 0x6c, 0x47, 0x1a, 0x96, 0xfc,
+	0x6d, 0x7e, 0x25, 0x4d, 0x0a, 0x85, 0x8c, 0x3f, 0xd0, 0xdf, 0x39, 0x91, 0x2d, 0xd5, 0xfb, 0x74,
+	0x41, 0x6f, 0x4f, 0x2c, 0x47, 0xd9, 0x12, 0xae, 0x7d, 0x68, 0xfa, 0x7e, 0x08, 0x0d, 0x8d, 0x09,
+	0x93, 0x30, 0x6b, 0x3c, 0x09, 0xc4, 0x21, 0x08, 0x8d, 0xa9, 0x81, 0xcc, 0x9d, 0x50, 0xbc, 0x0d,
+	0x8d, 0x09, 0x55, 0xb7, 0x3b, 0xf5, 0x3c, 0x1e, 0x90, 0xe6, 0xc4, 0x87, 0xe0, 0xc8, 0x1a, 0x2a,
+	0x53, 0x12, 0xea, 0x66, 0x40, 0x78, 0xac, 0x3b, 0x16, 0xde, 0x3d, 0x1d, 0x9f, 0x81, 0x2b, 0xd1,
+	0x2c, 0x34, 0x01, 0x65, 0x3c, 0x62, 0x56, 0x87, 0x3c, 0xc4, 0xea, 0xc2, 0x93, 0xc3, 0xa6, 0x63,
+	0xfc, 0x6d, 0x02, 0x4a, 0xc7, 0x03, 0x5d, 0x5c, 0x6c, 0x8a, 0x91, 0xd3, 0x4a, 0xa8, 0xd5, 0x5a,
+	0xee, 0x21, 0xde, 0x36, 0xd4, 0x39, 0xd4, 0x4f, 0x66, 0x4a, 0xd3, 0x53, 0x34, 0x31, 0x74, 0x8d,
+	0x9d, 0xfe, 0xf9, 0xc9, 0xf4, 0x34, 0xe6, 0x1a, 0x11, 0x7a, 0xe4, 0x0c, 0x22, 0x68, 0x76, 0x21,
+	0x85, 0xb9, 0x10, 0x3a, 0x74, 0x5c, 0xcf, 0x1a, 0x1c, 0xa0, 0x77, 0xb6, 0x85, 0xdc, 0x8c, 0x7f,
+	0x48, 0xc0, 0xea, 0x51, 0xeb, 0xe0, 0x50, 0x23, 0xfc, 0x11, 0xe4, 0xed, 0x49, 0x8f, 0xea, 0x16,
+	0xfe, 0x7c, 0x41, 0x22, 0x16, 0x00, 0x9e, 0x02, 0xd8, 0xe8, 0x78, 0x24, 0x6e, 0x72, 0xb6, 0x46,
+	0x38, 0xe3, 0x94, 0xf0, 0x6e, 0x1a, 0xf4, 0x15, 0x72, 0x6a, 0xf6, 0x6e, 0x1a, 0xb7, 0x35, 0xc4,
+	0x9d, 0x0e, 0x14, 0x6e, 0x7a, 0x16, 0x37, 0x26, 0x68, 0xe3, 0x5f, 0x0b, 0x50, 0x51, 0x41, 0x5d,
+	0x5b, 0x02, 0x2d, 0x22, 0x50, 0xc7, 0x40, 0xdc, 0x44, 0x44, 0x82, 0xe2, 0xe2, 0x95, 0x8e, 0xea,
+	0x31, 0xb7, 0xa9, 0x2a, 0x44, 0x0a, 0x09, 0xce, 0xf0, 0x60, 0xe3, 0x09, 0xbe, 0xc3, 0x80, 0x1b,
+	0xb0, 0xde, 0x9f, 0x4c, 0xfd, 0x1e, 0x55, 0x33, 0xb8, 0xa2, 0x48, 0x55, 0x22, 0x59, 0xa0, 0xc2,
+	0x6b, 0xdc, 0x26, 0x0f, 0xfa, 0x1f, 0x31, 0xfd, 0x19, 0x6b, 0xc3, 0x5c, 0xa1, 0x22, 0x07, 0xc6,
+	0xc3, 0x1c, 0x89, 0x45, 0x61, 0x8a, 0x0e, 0x18, 0xc3, 0x1c, 0x4f, 0x5e, 0xaf, 0x85, 0x3e, 0x4a,
+	0x95, 0xeb, 0x70, 0x45, 0x0d, 0x20, 0x05, 0x6e, 0x10, 0x8c, 0x2c, 0x51, 0x87, 0x28, 0x61, 0xe6,
+	0x56, 0xe5, 0xa1, 0x10, 0xae, 0xed, 0x54, 0x50, 0xab, 0x8e, 0x89, 0x00, 0x37, 0x30, 0x47, 0x3d,
+	0x91, 0x1a, 0x7c, 0xc2, 0x61, 0x1b, 0x29, 0x8c, 0x06, 0xf0, 0x3f, 0xff, 0x83, 0x1c, 0xfe, 0x94,
+	0x87, 0xe5, 0x3c, 0x26, 0x50, 0x0e, 0x88, 0xf4, 0xe0, 0x26, 0x6c, 0xd0, 0x80, 0xef, 0x9e, 0x06,
+	0xb1, 0xd1, 0x07, 0x3c, 0x8a, 0x1e, 0x94, 0x46, 0xa9, 0xf8, 0x22, 0xe1, 0xa0, 0xc3, 0x4d, 0xc7,
+	0x75, 0x24, 0xbc, 0xa8, 0x6f, 0xc3, 0x25, 0x1c, 0x39, 0xf0, 0x90, 0x07, 0xd0, 0x6b, 0xd1, 0x80,
+	0xe7, 0xfb, 0x12, 0x9c, 0xd1, 0xa9, 0x1e, 0x9b, 0x93, 0x09, 0x32, 0xab, 0x6d, 0xb3, 0xa2, 0x6f,
+	0xe3, 0x7f, 0x30, 0x27, 0x12, 0xfe, 0x48, 0x9f, 0x36, 0x75, 0xac, 0x73, 0xbb, 0xcf, 0x55, 0x25,
+	0x39, 0xfc, 0x98, 0x87, 0x51, 0x8c, 0xcc, 0xac, 0xfb, 0xa1, 0x37, 0xa1, 0x4a, 0xc0, 0xd4, 0xb3,
+	0x7a, 0x7d, 0xca, 0xe2, 0x2c, 0xaf, 0x7a, 0x97, 0x31, 0xee, 0xc3, 0x0d, 0xde, 0x17, 0x5d, 0xf0,
+	0x74, 0x3c, 0x8f, 0x74, 0x8f, 0x91, 0x3e, 0x85, 0x5b, 0xcc, 0x0c, 0x7a, 0x3d, 0x1b, 0x2f, 0x38,
+	0xf3, 0x68, 0x06, 0xa3, 0xa1, 0xe7, 0xa5, 0x1b, 0x46, 0x4c, 0x7a, 0x35, 0x25, 0x0d, 0x1e, 0x41,
+	0x93, 0x1a, 0xc8, 0x81, 0x1b, 0x3c, 0xf0, 0x00, 0x73, 0x5b, 0xcb, 0x3b, 0x95, 0x05, 0x17, 0xed,
+	0xe4, 0x60, 0x86, 0x7d, 0xaa, 0x99, 0x32, 0xf2, 0xef, 0x58, 0x41, 0xcf, 0xfb, 0xaa, 0xa7, 0x72,
+	0xba, 0x55, 0x9e, 0x8f, 0x47, 0x5a, 0xc2, 0xc5, 0xaa, 0x6b, 0x4a, 0xc6, 0x12, 0x6a, 0x45, 0x91,
+	0x2c, 0xad, 0x2d, 0x42, 0xb9, 0x23, 0xca, 0x99, 0x03, 0x59, 0x08, 0x0f, 0xa2, 0xc5, 0x2b, 0xfa,
+	0xe2, 0x81, 0x5a, 0x7c, 0x5d, 0x5f, 0x3c, 0x08, 0x17, 0xdf, 0x98, 0x59, 0x44, 0x2d, 0xbe, 0xc9,
+	0xf0, 0x7b, 0x70, 0x9d, 0xe1, 0x78, 0xee, 0xbd, 0x20, 0xe8, 0x8d, 0xed, 0xbe, 0x47, 0xcf, 0x40,
+	0x7e, 0x6f, 0xb2, 0xb3, 0xcd, 0xd1, 0x2d, 0x71, 0x01, 0xca, 0x0f, 0xb6, 0x39, 0xd6, 0x5d, 0x88,
+	0xb2, 0xc3, 0x71, 0xef, 0x42, 0x94, 0x1f, 0x70, 0x00, 0x4c, 0xe0, 0x15, 0xb7, 0xa6, 0x50, 0x4c,
+	0x0e, 0x40, 0xa8, 0x40, 0xc7, 0xc1, 0xc8, 0x8b, 0x17, 0x36, 0xbf, 0x7a, 0x93, 0x71, 0x50, 0xd7,
+	0x0a, 0x87, 0x8f, 0xdc, 0x07, 0x13, 0x75, 0xa9, 0xa3, 0xdd, 0x62, 0xb4, 0x1f, 0xc2, 0x6d, 0x46,
+	0x13, 0xc9, 0x3c, 0x21, 0x50, 0x36, 0xcf, 0xee, 0x4a, 0xa8, 0xac, 0x7a, 0x7f, 0xf6, 0x19, 0x60,
+	0x69, 0xe2, 0xbf, 0x03, 0xeb, 0xb4, 0x96, 0xef, 0x48, 0x47, 0x2a, 0x17, 0x78, 0x32, 0x6b, 0x13,
+	0x71, 0x2f, 0x6d, 0xfc, 0x4b, 0x8a, 0xae, 0x17, 0xc2, 0xeb, 0x1d, 0xfb, 0xe6, 0xd0, 0xa2, 0x7b,
+	0xab, 0x2a, 0x7f, 0xaa, 0x9a, 0xf0, 0x82, 0x7b, 0x2b, 0xe3, 0x86, 0xa5, 0x50, 0x7a, 0xbd, 0x62,
+	0x5f, 0x81, 0x0e, 0x6e, 0x49, 0x91, 0xab, 0xf6, 0xcb, 0x24, 0xe4, 0x43, 0xfc, 0x6f, 0x43, 0x29,
+	0xaa, 0xb1, 0xe2, 0xa5, 0x46, 0x56, 0x59, 0xaf, 0x2e, 0xa8, 0xb2, 0xca, 0x32, 0xa7, 0x39, 0x1a,
+	0xe1, 0x1d, 0x28, 0xb0, 0x06, 0xcb, 0xb7, 0xa8, 0x6c, 0x03, 0x68, 0xac, 0x8b, 0xd8, 0x70, 0x73,
+	0x1e, 0x4f, 0x93, 0xda, 0x67, 0xb0, 0x12, 0xd6, 0x5a, 0x7b, 0x5c, 0x31, 0x9c, 0x2b, 0xcc, 0x46,
+	0xef, 0x97, 0x5f, 0x20, 0x93, 0x9c, 0xf3, 0x88, 0x0a, 0xdd, 0xa7, 0xdf, 0x24, 0x95, 0x2d, 0x7a,
+	0x32, 0xad, 0xfd, 0x0e, 0x5e, 0xee, 0xf0, 0xef, 0x4c, 0xa1, 0xe4, 0x26, 0xdf, 0xd3, 0xc4, 0x1b,
+	0xa3, 0x76, 0xa3, 0x96, 0x8f, 0xac, 0x97, 0xac, 0x1b, 0x46, 0x75, 0x80, 0xf4, 0x92, 0x1a, 0xea,
+	0x5f, 0x03, 0xac, 0xce, 0x78, 0x81, 0x05, 0x01, 0xad, 0x1c, 0x7b, 0x58, 0x24, 0x08, 0xa6, 0x2f,
+	0xfd, 0x8f, 0xfd, 0x51, 0x78, 0x55, 0xbc, 0x03, 0xd7, 0x70, 0xc2, 0x88, 0x62, 0x88, 0x80, 0xf7,
+	0x4e, 0x3d, 0x94, 0x0c, 0x15, 0xde, 0xc4, 0xe5, 0xf1, 0x36, 0x5c, 0x9d, 0x41, 0xa0, 0xab, 0x27,
+	0x8d, 0x67, 0x94, 0x1b, 0xb0, 0x1d, 0x3f, 0xf0, 0xa6, 0xf2, 0x00, 0x64, 0x95, 0xb3, 0x13, 0xce,
+	0xdd, 0xb3, 0x4e, 0x2d, 0x8f, 0x2a, 0x01, 0xbe, 0xbc, 0x59, 0x6e, 0xd0, 0x7b, 0x18, 0x8d, 0x8c,
+	0x6d, 0x0e, 0xb3, 0x79, 0x75, 0x9b, 0x3c, 0xc1, 0x44, 0x0b, 0xe1, 0xea, 0x7e, 0x89, 0x8e, 0x44,
+	0x40, 0x14, 0x22, 0xa8, 0xbb, 0xec, 0x09, 0x46, 0x3e, 0xc9, 0x43, 0x51, 0xc1, 0x70, 0x1b, 0x05,
+	0x13, 0x21, 0x01, 0x85, 0x81, 0x21, 0xb2, 0xd7, 0x47, 0xdb, 0x7a, 0xcf, 0xfe, 0x93, 0xa3, 0x2f,
+	0x69, 0x59, 0xc2, 0x56, 0x19, 0x86, 0x49, 0xd8, 0x04, 0x35, 0xdb, 0xe3, 0x1b, 0xa9, 0x72, 0x90,
+	0x48, 0xe2, 0xd8, 0xc6, 0x4c, 0x48, 0x41, 0xcb, 0x21, 0xd4, 0xfc, 0xad, 0x08, 0x7a, 0x25, 0x64,
+	0x94, 0xe4, 0xf5, 0x15, 0x9e, 0xd0, 0x0f, 0x76, 0xc0, 0x0c, 0x54, 0x94, 0xcb, 0x23, 0x0a, 0xc6,
+	0xf6, 0x50, 0x28, 0x40, 0x79, 0x48, 0x9c, 0x61, 0x8e, 0xec, 0x21, 0xbf, 0xa6, 0xa8, 0xb5, 0x36,
+	0xd4, 0x88, 0x35, 0x9e, 0x8e, 0x18, 0x5b, 0x8d, 0x6c, 0xaa, 0x08, 0x31, 0x7a, 0xd6, 0x1b, 0x08,
+	0xc1, 0x8d, 0x5c, 0xca, 0x46, 0xae, 0xaa, 0x08, 0x17, 0x1f, 0x50, 0xd2, 0xba, 0xa6, 0x56, 0x8c,
+	0x86, 0x7d, 0xb4, 0x5c, 0x4b, 0xdc, 0x03, 0x58, 0xad, 0x33, 0x23, 0x6a, 0xe6, 0x75, 0x15, 0xef,
+	0xa3, 0xf1, 0x09, 0x69, 0x51, 0xf0, 0x56, 0x53, 0x6e, 0x7b, 0x7e, 0x54, 0x2d, 0x70, 0x43, 0x23,
+	0xd9, 0xd6, 0x49, 0xbe, 0xa9, 0x91, 0x6c, 0xcf, 0x93, 0x7c, 0x4b, 0xdb, 0xd8, 0x9e, 0xdb, 0xf8,
+	0xb6, 0xb6, 0xb1, 0xbd, 0x78, 0xe3, 0x3b, 0x4a, 0xf3, 0xa3, 0x51, 0x5f, 0x6e, 0x79, 0x37, 0xa4,
+	0x45, 0x82, 0x14, 0xee, 0x3d, 0x65, 0x39, 0x34, 0x20, 0x25, 0x13, 0xc6, 0xe9, 0x10, 0xa6, 0xb0,
+	0xef, 0x2b, 0x8d, 0xd2, 0x88, 0x46, 0x94, 0xc8, 0xa9, 0x30, 0x25, 0xd4, 0xe1, 0x6a, 0xd2, 0xa7,
+	0x6a, 0x8b, 0x41, 0x30, 0x3a, 0x91, 0xf4, 0x3c, 0x08, 0x53, 0x01, 0x05, 0x53, 0xd8, 0x22, 0xff,
+	0x41, 0x7b, 0xe4, 0x11, 0x49, 0x91, 0x48, 0x63, 0x30, 0x13, 0x8c, 0x80, 0x0a, 0xff, 0x71, 0x98,
+	0x3a, 0xd0, 0x90, 0x46, 0xd3, 0x13, 0x25, 0xc6, 0xd8, 0x80, 0x9a, 0xf6, 0x99, 0x22, 0xca, 0x8e,
+	0x88, 0x7a, 0xaa, 0x88, 0xb2, 0x67, 0x89, 0xfa, 0xb6, 0xb2, 0x7c, 0x79, 0x14, 0x05, 0xfe, 0x16,
+	0x43, 0x6b, 0x50, 0xd1, 0xa0, 0x6a, 0xc6, 0x77, 0xd4, 0xfa, 0x8e, 0x3b, 0x50, 0x7a, 0xdf, 0x56,
+	0xeb, 0x87, 0x30, 0x85, 0xfd, 0x4c, 0x31, 0xcd, 0x23, 0x92, 0xe9, 0xe7, 0x8a, 0xe9, 0x08, 0xa8,
+	0xf0, 0x3f, 0x57, 0x4c, 0xf3, 0x90, 0xc6, 0xf4, 0x17, 0x8a, 0xe9, 0xd8, 0x80, 0x9a, 0xb6, 0xc3,
+	0xf5, 0xa9, 0x63, 0xc8, 0xc9, 0x62, 0x0e, 0xe6, 0x75, 0x79, 0x93, 0x9e, 0x56, 0xc4, 0x33, 0xe0,
+	0xe2, 0x47, 0x97, 0xb8, 0xaf, 0x5e, 0x1a, 0x9b, 0x8c, 0x7f, 0xce, 0x41, 0x86, 0xdb, 0x6e, 0xe4,
+	0x23, 0x4e, 0x62, 0xb6, 0xbd, 0x44, 0xf5, 0xe4, 0xcc, 0xbe, 0x29, 0x26, 0x67, 0x43, 0x92, 0xfe,
+	0xa6, 0xa8, 0x53, 0x98, 0x9a, 0x6b, 0x58, 0x91, 0x14, 0xea, 0x6f, 0x55, 0x69, 0x8e, 0x3e, 0x35,
+	0x48, 0x51, 0xeb, 0x81, 0xa8, 0x7b, 0x97, 0xb4, 0x1b, 0x51, 0x67, 0xff, 0xb2, 0x4f, 0x8a, 0xf1,
+	0x37, 0xab, 0xdc, 0xf2, 0x37, 0xab, 0x27, 0xb0, 0xa2, 0x3d, 0xa7, 0x92, 0xe7, 0x4f, 0x2d, 0x7d,
+	0x4f, 0x9d, 0xef, 0x18, 0x29, 0x5c, 0xdc, 0x31, 0x52, 0xfb, 0x55, 0x1a, 0x0a, 0x78, 0xd7, 0x17,
+	0xbe, 0x13, 0x6f, 0x92, 0x7a, 0x71, 0xf8, 0xf6, 0x8c, 0x70, 0xb7, 0x42, 0x44, 0x51, 0x13, 0xde,
+	0xa6, 0xf0, 0x39, 0x45, 0xd3, 0x94, 0x77, 0xce, 0xbb, 0xcb, 0xf1, 0xf7, 0x19, 0xaf, 0xf2, 0x1c,
+	0x72, 0xe2, 0xdd, 0x40, 0x95, 0xba, 0xef, 0x2d, 0x9f, 0x22, 0xea, 0xf8, 0x56, 0xe5, 0xbb, 0x78,
+	0x07, 0x75, 0xd4, 0x2c, 0x11, 0xa7, 0xef, 0x2f, 0x9f, 0x75, 0xac, 0x50, 0x89, 0xba, 0x3e, 0x17,
+	0xe8, 0xe4, 0xcb, 0xc6, 0x05, 0xd4, 0x89, 0x42, 0x1e, 0x51, 0x37, 0x40, 0xb3, 0xf5, 0xdc, 0x8f,
+	0xf2, 0x85, 0xe7, 0x02, 0xea, 0xf6, 0x04, 0x62, 0x0d, 0x77, 0x91, 0xbc, 0x3d, 0x90, 0x71, 0x8f,
+	0xd2, 0x31, 0x95, 0xf8, 0x55, 0x66, 0x32, 0x13, 0x7a, 0xa2, 0xd8, 0xa6, 0xf3, 0x21, 0x48, 0x8c,
+	0x99, 0x4a, 0x62, 0x69, 0xe6, 0xf7, 0x1c, 0x0a, 0x11, 0x5b, 0x97, 0x9c, 0xf3, 0x6d, 0xc8, 0x4a,
+	0xae, 0xee, 0x43, 0x4e, 0xbc, 0x3f, 0x5c, 0x84, 0xbe, 0x05, 0x39, 0xc9, 0xd1, 0xa5, 0xf0, 0x8d,
+	0xd7, 0xd1, 0x5b, 0xde, 0x7e, 0xfd, 0xb8, 0xb5, 0x4b, 0x35, 0xf7, 0x22, 0x32, 0xd6, 0x38, 0x6a,
+	0x74, 0xde, 0x51, 0x9f, 0x4a, 0x09, 0x69, 0x6e, 0xa9, 0x9f, 0x29, 0xc2, 0xdb, 0xed, 0x34, 0xa8,
+	0x85, 0x85, 0x1e, 0x1c, 0x73, 0x7b, 0x8d, 0xa3, 0x6e, 0xa7, 0xfd, 0x93, 0x72, 0xc6, 0xf8, 0xb7,
+	0x04, 0x55, 0x49, 0xa8, 0x1c, 0x6c, 0x5d, 0xea, 0x74, 0xcb, 0x93, 0x97, 0x5c, 0x74, 0xf2, 0x66,
+	0x4f, 0x7e, 0xea, 0xb2, 0x27, 0x3f, 0xbd, 0xcc, 0x37, 0xcd, 0x9f, 0xa7, 0x0c, 0xaf, 0xb9, 0xf4,
+	0x3c, 0xc5, 0xd5, 0x93, 0x5d, 0x2a, 0xbf, 0xbf, 0x4b, 0x41, 0x5e, 0x59, 0xc4, 0x4c, 0x66, 0x7b,
+	0x0f, 0x72, 0xc2, 0x8e, 0x96, 0xa7, 0xb7, 0x97, 0xf2, 0x5a, 0x31, 0x4a, 0xd2, 0x4b, 0xfd, 0xd0,
+	0x23, 0xc8, 0x2b, 0xf7, 0x22, 0x0f, 0xca, 0xb2, 0x4b, 0xc4, 0x25, 0x9b, 0x72, 0xe2, 0xfd, 0x17,
+	0x85, 0x8b, 0xfb, 0x2f, 0x50, 0x65, 0x67, 0xdc, 0x95, 0xd4, 0xe3, 0x0e, 0xb1, 0xf9, 0x06, 0x10,
+	0xbd, 0xb1, 0xe9, 0x31, 0x14, 0xdf, 0xdb, 0x23, 0xbc, 0xf9, 0x73, 0xd7, 0x8e, 0xec, 0xab, 0xd0,
+	0x1c, 0xa1, 0xd6, 0xd1, 0xa3, 0xda, 0x31, 0xb2, 0xdc, 0x8e, 0x11, 0xe5, 0xf9, 0xb0, 0x38, 0xcf,
+	0x8f, 0x37, 0x6c, 0x14, 0x2f, 0x6c, 0xd8, 0x30, 0x7e, 0x95, 0x5a, 0x78, 0x23, 0xb9, 0x84, 0xde,
+	0xfe, 0x47, 0x06, 0x3a, 0xd3, 0x46, 0x93, 0x9e, 0xe5, 0x56, 0x73, 0xfb, 0xba, 0x3d, 0x64, 0x96,
+	0xd9, 0x83, 0xc1, 0x0d, 0x92, 0x01, 0xbd, 0xe2, 0x92, 0x73, 0x5f, 0x8f, 0x53, 0x47, 0x17, 0x9c,
+	0x19, 0xe7, 0x92, 0x5b, 0x6a, 0x33, 0x0f, 0xb4, 0x7e, 0xaa, 0xfc, 0x6c, 0x38, 0x52, 0xab, 0x4d,
+	0x7d, 0x3c, 0x3e, 0xeb, 0x02, 0xaf, 0x37, 0x9d, 0xa0, 0x3a, 0xac, 0x9e, 0x20, 0xa0, 0xc0, 0x8d,
+	0x73, 0x0b, 0x09, 0xc0, 0x6c, 0x27, 0x3e, 0x63, 0x3a, 0x45, 0x9e, 0x60, 0x46, 0x8b, 0xc5, 0xcb,
+	0x68, 0xf1, 0x1b, 0xda, 0x6e, 0x62, 0x56, 0x5a, 0xba, 0xd8, 0x4a, 0x55, 0x57, 0xd5, 0x2a, 0x37,
+	0x3c, 0xfd, 0x01, 0x00, 0x68, 0x4c, 0x6a, 0x7a, 0x4f, 0x2c, 0xd1, 0x7b, 0x28, 0xfa, 0xe4, 0x72,
+	0xd1, 0xaf, 0x41, 0x0e, 0xa1, 0x74, 0xff, 0x95, 0x6d, 0x37, 0x9f, 0x85, 0xaf, 0xc2, 0x42, 0x5e,
+	0x37, 0x16, 0x89, 0x58, 0x3e, 0x9a, 0x12, 0x32, 0x7a, 0x7b, 0x1f, 0xef, 0x9f, 0x70, 0x01, 0x72,
+	0x87, 0x51, 0xc2, 0xc3, 0x91, 0x62, 0xb1, 0xc6, 0x8d, 0x67, 0x89, 0x23, 0x9c, 0x31, 0xc6, 0xdc,
+	0x05, 0xc6, 0x18, 0xbb, 0x1f, 0x73, 0x4b, 0x1f, 0xcb, 0x8f, 0xf4, 0x58, 0xe4, 0x0d, 0x91, 0x53,
+	0x71, 0xe6, 0x3f, 0xf2, 0x71, 0xcf, 0x6b, 0x8a, 0x5d, 0x59, 0xa2, 0xd8, 0xcf, 0xc5, 0xf5, 0x4f,
+	0x94, 0x19, 0x84, 0x81, 0x48, 0x9d, 0x5d, 0x5f, 0xa0, 0x33, 0xc1, 0xad, 0xf1, 0x32, 0x7c, 0xf3,
+	0xbe, 0x02, 0x25, 0xd1, 0x2e, 0xd9, 0x3b, 0xa8, 0x1f, 0x75, 0x1b, 0xd4, 0x78, 0x52, 0x86, 0x15,
+	0x09, 0xaa, 0xbf, 0x6e, 0xb4, 0xba, 0x65, 0xba, 0xa3, 0xae, 0x49, 0x48, 0xe3, 0xc7, 0x8d, 0xdd,
+	0xe3, 0x6e, 0xbb, 0x53, 0x4e, 0x1a, 0x7f, 0x91, 0x85, 0xac, 0x94, 0x9a, 0x01, 0xb7, 0x31, 0x82,
+	0x1d, 0xb5, 0x5b, 0xbd, 0xdd, 0xf6, 0xc1, 0x41, 0xbd, 0xb5, 0x17, 0xe2, 0xf5, 0x5e, 0xd5, 0x9b,
+	0xfb, 0x8d, 0x3d, 0x5c, 0x55, 0xc7, 0x69, 0x75, 0xeb, 0xcd, 0x56, 0xa3, 0xd3, 0x13, 0xf1, 0x51,
+	0xe1, 0x6c, 0x56, 0xee, 0xc0, 0x8d, 0x79, 0x9c, 0xe6, 0x41, 0xb3, 0x5b, 0xef, 0x36, 0xdb, 0xad,
+	0xf2, 0x7a, 0xe5, 0x13, 0xb8, 0x7b, 0x01, 0x42, 0x6f, 0xaf, 0x79, 0xf4, 0xb6, 0xbc, 0x81, 0x67,
+	0xd0, 0xb8, 0x08, 0xeb, 0xa0, 0x71, 0xd0, 0xee, 0xfc, 0xa4, 0x9c, 0xc7, 0x1b, 0x68, 0x6d, 0x0e,
+	0xef, 0xb0, 0xd3, 0x68, 0x1c, 0x1c, 0x76, 0x91, 0x9c, 0x2b, 0x0b, 0x49, 0x3e, 0x3e, 0xdc, 0xc3,
+	0x50, 0xad, 0x48, 0xbe, 0x8a, 0x31, 0xe2, 0x13, 0x89, 0x13, 0xb2, 0xdc, 0x69, 0xbc, 0x6e, 0x62,
+	0x0c, 0x17, 0x9b, 0x75, 0x9b, 0x07, 0x8d, 0xf6, 0x71, 0xb7, 0x7c, 0x0d, 0x4f, 0xd5, 0x83, 0x79,
+	0xcc, 0x85, 0xb8, 0x55, 0x8d, 0xb2, 0x10, 0x17, 0x75, 0x73, 0xd0, 0x6c, 0xd5, 0x89, 0xb2, 0x04,
+	0x9a, 0xc5, 0xcd, 0xd9, 0x71, 0x4a, 0x29, 0x68, 0x2d, 0x5c, 0x72, 0x0f, 0x93, 0x8c, 0x9b, 0x50,
+	0x95, 0x18, 0xaf, 0x3a, 0xf5, 0x83, 0xc6, 0x97, 0xed, 0xce, 0x5b, 0xdc, 0xee, 0xa0, 0xfd, 0x0e,
+	0x47, 0xe9, 0x5d, 0x69, 0x4d, 0x8e, 0xbe, 0xde, 0xed, 0x35, 0x3a, 0x1d, 0x54, 0x68, 0x5a, 0xdb,
+	0xb4, 0xd9, 0x7a, 0x57, 0xdf, 0x6f, 0xee, 0x45, 0x53, 0x9b, 0x7b, 0xe5, 0x0c, 0xde, 0x87, 0x36,
+	0x67, 0xc6, 0xdb, 0xaf, 0x5e, 0x35, 0x3a, 0x47, 0xe5, 0xac, 0x36, 0x55, 0x58, 0x11, 0x69, 0x02,
+	0x65, 0xd6, 0x6a, 0xec, 0x12, 0xbd, 0x39, 0x6d, 0x6a, 0xa7, 0x81, 0xf0, 0xdd, 0xe6, 0x7e, 0x53,
+	0xa8, 0xb4, 0xa0, 0x11, 0x1a, 0x36, 0xee, 0xf6, 0x54, 0x13, 0x70, 0x05, 0x53, 0x9e, 0xeb, 0x72,
+	0x94, 0x6d, 0x31, 0xbe, 0x2e, 0xe0, 0x8d, 0x6e, 0x23, 0x36, 0xac, 0x38, 0x2c, 0xa2, 0xb7, 0xbc,
+	0x3a, 0x33, 0x72, 0xd4, 0xad, 0x77, 0x68, 0xd6, 0xca, 0xdc, 0x2c, 0xb5, 0x5d, 0x49, 0xf4, 0x1c,
+	0xf3, 0x08, 0x77, 0x18, 0x4b, 0x3e, 0xcb, 0xab, 0x1a, 0x95, 0x3c, 0x70, 0xdc, 0xaa, 0x1f, 0x77,
+	0xdf, 0xb4, 0x3b, 0xcd, 0x9f, 0xe2, 0x82, 0x6b, 0xb3, 0xd3, 0xd4, 0x7a, 0x65, 0xe3, 0x13, 0xc8,
+	0xbd, 0xb2, 0x47, 0x01, 0xa6, 0x70, 0x28, 0x82, 0x55, 0xbc, 0x13, 0xa2, 0xaf, 0xec, 0x45, 0x1f,
+	0x19, 0x70, 0x13, 0xf8, 0x8e, 0x61, 0x43, 0x51, 0xef, 0x6f, 0x7d, 0x06, 0x85, 0x73, 0xd3, 0xb3,
+	0xe9, 0xb1, 0x40, 0xe5, 0x99, 0xb7, 0x17, 0x76, 0xc2, 0x6e, 0xbd, 0x93, 0x68, 0xb5, 0x87, 0x90,
+	0x57, 0xff, 0xcf, 0x84, 0xde, 0xb0, 0xd1, 0x8c, 0xfb, 0xd5, 0x8d, 0x87, 0x50, 0x88, 0xbe, 0x1d,
+	0x28, 0x42, 0xea, 0xbd, 0xf5, 0x71, 0x31, 0xe2, 0x17, 0x00, 0x21, 0xa2, 0x8f, 0x27, 0xaa, 0x30,
+	0x51, 0xbf, 0x24, 0x49, 0x8b, 0xbe, 0x46, 0x30, 0xbe, 0x03, 0x80, 0xa9, 0xf5, 0x00, 0x69, 0xb3,
+	0xcd, 0xd1, 0x6c, 0x7b, 0x11, 0xed, 0x42, 0x1f, 0x45, 0x58, 0x78, 0xf7, 0x08, 0xe4, 0x27, 0x02,
+	0xdf, 0x87, 0x62, 0x34, 0xc1, 0x27, 0x5f, 0xda, 0x8f, 0x7e, 0xca, 0x9d, 0x34, 0x5f, 0x1a, 0xe1,
+	0x1a, 0xbf, 0x06, 0x85, 0x0e, 0x06, 0x87, 0x7d, 0x7a, 0xcb, 0x20, 0x4e, 0x7e, 0x36, 0x91, 0x12,
+	0x9d, 0x6d, 0xf2, 0x49, 0x8a, 0x3e, 0x4d, 0x6a, 0x81, 0xef, 0xab, 0x0f, 0x05, 0xd2, 0x46, 0x00,
+	0x10, 0x4e, 0xf7, 0xd1, 0xd1, 0x67, 0x65, 0x6f, 0xca, 0x1c, 0x73, 0xd1, 0x26, 0xb7, 0x60, 0xd3,
+	0x1c, 0x0e, 0x3d, 0x6b, 0x48, 0xc1, 0x77, 0x20, 0x5a, 0x48, 0x7a, 0xb4, 0x6d, 0x52, 0x15, 0xef,
+	0xe7, 0x87, 0x67, 0x76, 0xfd, 0x3a, 0x09, 0x99, 0xe6, 0x98, 0x4a, 0xe1, 0x4b, 0xbb, 0x28, 0x79,
+	0x58, 0x5c, 0x22, 0x11, 0xc7, 0x9c, 0x4c, 0xfa, 0x32, 0xa3, 0x9f, 0xc3, 0xa9, 0xe3, 0x18, 0x75,
+	0xb2, 0x0d, 0xdc, 0xfe, 0x7b, 0x6b, 0x41, 0xc7, 0x9b, 0xc0, 0xda, 0xe3, 0xd1, 0xca, 0x06, 0x5e,
+	0xf9, 0xa8, 0x64, 0x25, 0xb2, 0x25, 0xd9, 0xc4, 0x5c, 0x7b, 0x09, 0x69, 0x5e, 0x25, 0x6e, 0x33,
+	0x20, 0x0b, 0xc8, 0xf1, 0x7e, 0xb0, 0xd4, 0x92, 0x7e, 0xb0, 0x5f, 0x87, 0xac, 0xdc, 0x23, 0xbe,
+	0xca, 0x23, 0x80, 0x48, 0x97, 0xf3, 0x3c, 0x68, 0xaa, 0xbc, 0x19, 0xf5, 0x28, 0xd5, 0x0f, 0x0f,
+	0x77, 0xd1, 0xbf, 0xe1, 0x9d, 0x68, 0xaf, 0xbd, 0xfb, 0xb6, 0x41, 0x71, 0xe6, 0xeb, 0x14, 0x64,
+	0x65, 0x37, 0xd8, 0x7d, 0xf9, 0x7d, 0x48, 0x8a, 0x85, 0xb6, 0x39, 0xdb, 0x2d, 0x26, 0x3e, 0x0d,
+	0xa1, 0xaa, 0x67, 0x18, 0x10, 0xb9, 0x31, 0x2b, 0xec, 0xfd, 0xa2, 0x52, 0x45, 0x2f, 0xea, 0x7f,
+	0x47, 0xb7, 0x95, 0xb1, 0xc7, 0x2a, 0xad, 0x28, 0x3e, 0x5f, 0x9b, 0x91, 0x5d, 0xe5, 0x61, 0x98,
+	0x67, 0x64, 0x66, 0xb3, 0x20, 0xb9, 0xa3, 0x6c, 0x39, 0xfb, 0xf7, 0xa8, 0x89, 0xec, 0x49, 0xec,
+	0x13, 0x88, 0x9b, 0x4b, 0x66, 0x08, 0x05, 0xff, 0x3f, 0x28, 0x09, 0xe5, 0xf5, 0x62, 0x6d, 0x70,
+	0x9f, 0x2c, 0x9b, 0x24, 0xe4, 0x2c, 0x60, 0xb5, 0x9f, 0xc2, 0x8a, 0xfe, 0x9b, 0x8e, 0xd6, 0xc0,
+	0xa3, 0xee, 0x21, 0xd9, 0xc9, 0x17, 0xff, 0x50, 0xe5, 0x29, 0xac, 0x8a, 0xd1, 0x9e, 0x3b, 0x11,
+	0xb5, 0xe0, 0xd4, 0xac, 0x46, 0xa2, 0xf3, 0x4e, 0x1f, 0xcb, 0xcc, 0x7f, 0x90, 0x81, 0xa9, 0x82,
+	0x50, 0x4a, 0xef, 0x5d, 0x7b, 0xff, 0xf8, 0xa0, 0x51, 0x4e, 0x18, 0x57, 0xa3, 0x8f, 0x6a, 0x3a,
+	0x5f, 0xa2, 0xde, 0xe8, 0x6f, 0x1b, 0x75, 0xf6, 0x1f, 0x09, 0x28, 0xb6, 0xac, 0x20, 0xfc, 0x84,
+	0x66, 0x07, 0x56, 0xec, 0x49, 0x4f, 0xf6, 0x41, 0x87, 0xb5, 0x9f, 0x3b, 0xd1, 0xde, 0x1a, 0xf2,
+	0x56, 0xf3, 0x50, 0xfb, 0x1c, 0x8a, 0x59, 0x10, 0x9d, 0xd4, 0xc8, 0xe0, 0xd0, 0x73, 0xa7, 0x13,
+	0xf1, 0x6c, 0x51, 0xf8, 0xe6, 0x27, 0x8a, 0xda, 0x8f, 0xa0, 0x10, 0x2d, 0xb6, 0x0d, 0x79, 0xfe,
+	0x98, 0xad, 0xef, 0x8e, 0xa4, 0x72, 0x6e, 0x2f, 0xde, 0xff, 0x50, 0x62, 0x71, 0x8d, 0x32, 0xa4,
+	0x5a, 0x3a, 0xac, 0xdb, 0x90, 0x0f, 0xc7, 0xd1, 0x5e, 0x9b, 0x87, 0xe7, 0x5f, 0x20, 0xdf, 0xe2,
+	0xbf, 0xef, 0x22, 0xe7, 0xbf, 0xcc, 0x40, 0x29, 0x9e, 0x21, 0x3f, 0x89, 0x9d, 0xf4, 0x9b, 0x4b,
+	0x12, 0x69, 0x61, 0x10, 0xf7, 0xa2, 0x02, 0x83, 0x28, 0xf7, 0xcd, 0x77, 0x44, 0xc6, 0x2b, 0x6e,
+	0x24, 0x97, 0xe7, 0x33, 0x2e, 0xc0, 0x58, 0xb6, 0x85, 0x30, 0x17, 0x26, 0x6a, 0x1b, 0x32, 0x8c,
+	0x24, 0x0d, 0xfb, 0xde, 0xb2, 0x29, 0x07, 0x04, 0xe6, 0x19, 0x4f, 0xf9, 0x59, 0x55, 0x5c, 0xcf,
+	0xb8, 0x8c, 0x93, 0x9b, 0x6d, 0x7e, 0xd6, 0x64, 0x58, 0xfb, 0xb3, 0x14, 0x80, 0xb6, 0x5d, 0x49,
+	0x1d, 0x34, 0x71, 0x14, 0xeb, 0x90, 0x93, 0x6b, 0xc9, 0x4f, 0xbd, 0x9e, 0x7c, 0x33, 0xc9, 0x6a,
+	0xf9, 0x17, 0xe9, 0x37, 0xed, 0xa3, 0x6e, 0xa5, 0x01, 0x25, 0x6a, 0x89, 0xe7, 0x07, 0x79, 0xdb,
+	0x19, 0xaa, 0xa7, 0xac, 0xad, 0x4b, 0x2c, 0x44, 0xcd, 0x2d, 0x07, 0x62, 0x1a, 0x7d, 0x7f, 0x85,
+	0xb1, 0xe2, 0xdc, 0x1e, 0x59, 0xc3, 0xd0, 0x35, 0xca, 0xef, 0xaf, 0x1e, 0xe2, 0x50, 0x78, 0x22,
+	0xe6, 0x3b, 0xe7, 0xa3, 0x30, 0x5a, 0x85, 0xf2, 0xa9, 0xeb, 0xd1, 0xc7, 0x09, 0x53, 0xbc, 0x81,
+	0x0b, 0x3e, 0xf9, 0xd3, 0x14, 0xfa, 0x88, 0x48, 0xa8, 0xb3, 0x27, 0x4f, 0x66, 0x4e, 0x7d, 0x14,
+	0x51, 0xfb, 0x21, 0x14, 0x75, 0x3a, 0x42, 0xe7, 0x14, 0x7d, 0xaa, 0x13, 0xf7, 0x63, 0x04, 0x17,
+	0x1f, 0x25, 0x94, 0x35, 0x3b, 0xe6, 0x8f, 0x5d, 0x8c, 0xcf, 0x21, 0x27, 0x85, 0x43, 0x86, 0x48,
+	0xe2, 0x11, 0x2e, 0xf4, 0x65, 0xa7, 0xb9, 0xf7, 0xba, 0x21, 0xba, 0xc6, 0x5b, 0xed, 0x16, 0x15,
+	0x9b, 0xf0, 0xbf, 0xe3, 0x23, 0x74, 0xab, 0xe9, 0xda, 0x67, 0x50, 0x88, 0x94, 0x7b, 0x3b, 0xd2,
+	0xcf, 0x22, 0x47, 0x68, 0xdc, 0x8a, 0x6a, 0x5a, 0xd2, 0x2f, 0x8b, 0x3e, 0x52, 0xcc, 0xd8, 0x8e,
+	0xd0, 0xe8, 0x7f, 0x2f, 0x01, 0x6b, 0x33, 0x57, 0x8c, 0x79, 0x7b, 0x49, 0x5c, 0x60, 0x2f, 0x1c,
+	0xf8, 0xf9, 0x70, 0x8b, 0x27, 0xdb, 0xf9, 0x68, 0xc1, 0x83, 0x8c, 0xba, 0xa1, 0x15, 0x7d, 0x27,
+	0xf2, 0xe3, 0xbb, 0x92, 0x71, 0x8c, 0x99, 0x47, 0x84, 0xf3, 0x94, 0x0d, 0xac, 0xd7, 0x1f, 0xa9,
+	0xfe, 0xa0, 0x1b, 0x8b, 0x96, 0x22, 0x0a, 0x76, 0xd1, 0x4d, 0x5c, 0x87, 0xac, 0xf8, 0x8f, 0xee,
+	0x5f, 0xfd, 0x11, 0x75, 0x79, 0x89, 0xa2, 0x7c, 0xc9, 0x78, 0x4c, 0x35, 0x4c, 0xbe, 0x67, 0xdd,
+	0x09, 0xbd, 0x8d, 0x60, 0x64, 0x6d, 0xc6, 0xdb, 0x18, 0xf7, 0x21, 0xc3, 0xff, 0x2c, 0x4d, 0xab,
+	0x48, 0x55, 0x7f, 0x94, 0x80, 0x34, 0xe9, 0x9d, 0x9c, 0x99, 0x33, 0x1d, 0x9f, 0xc8, 0xcf, 0x0a,
+	0x4b, 0x9a, 0xb7, 0x96, 0xdf, 0x95, 0xc4, 0x75, 0x5c, 0xf9, 0x2e, 0xc0, 0xb9, 0xed, 0xdb, 0xb2,
+	0xd4, 0x96, 0xe6, 0x53, 0x63, 0x2c, 0xb9, 0xc0, 0x6f, 0xbd, 0x0b, 0x31, 0x35, 0x27, 0x99, 0x59,
+	0xf2, 0x8e, 0xfb, 0x00, 0x32, 0xdc, 0xee, 0x85, 0xf9, 0x4d, 0x66, 0xc2, 0x7d, 0x5f, 0x82, 0xc1,
+	0x55, 0xcd, 0xd6, 0x11, 0x6c, 0xfc, 0x7e, 0x12, 0xfd, 0x7f, 0xac, 0x4e, 0x10, 0xa7, 0x49, 0xf8,
+	0xb7, 0xcb, 0xd0, 0x14, 0xe7, 0x75, 0x3d, 0xfe, 0xe9, 0x57, 0x4a, 0x09, 0x80, 0xdf, 0xe4, 0xe9,
+	0xd9, 0x38, 0x3d, 0xfb, 0x61, 0x4d, 0x46, 0x05, 0x6f, 0x41, 0x6e, 0x76, 0xd6, 0x66, 0x05, 0x3b,
+	0x11, 0xe7, 0xb9, 0x25, 0x9c, 0x23, 0xfd, 0x1a, 0x55, 0x25, 0x28, 0x84, 0xf7, 0x1d, 0x8c, 0x76,
+	0x18, 0xfa, 0x76, 0xf7, 0x8f, 0xf9, 0x4a, 0xcc, 0x1f, 0x8b, 0x36, 0x7e, 0x8c, 0xff, 0xb6, 0xea,
+	0xfb, 0x68, 0xee, 0x4f, 0x00, 0xbe, 0xb4, 0xec, 0xe1, 0x99, 0xf8, 0x5c, 0x07, 0x35, 0xf9, 0x81,
+	0x7f, 0xc9, 0x17, 0xef, 0x15, 0xf9, 0x45, 0x40, 0xa8, 0xf0, 0xe2, 0x3b, 0x41, 0x37, 0x63, 0x6b,
+	0x6c, 0x84, 0x9f, 0x9c, 0x9d, 0x4c, 0xed, 0xd1, 0xa0, 0x37, 0x10, 0x55, 0x90, 0x84, 0x0e, 0xa3,
+	0x6a, 0x41, 0xd4, 0xb9, 0x25, 0x60, 0x5c, 0x6e, 0x09, 0x65, 0x32, 0xb4, 0x83, 0x9e, 0x7f, 0x66,
+	0x4a, 0x99, 0x20, 0x12, 0x01, 0xc4, 0xab, 0x98, 0x0c, 0x9b, 0x12, 0x29, 0x30, 0x87, 0xc2, 0xfd,
+	0xa0, 0xa1, 0xa6, 0x5f, 0x8d, 0xcc, 0xe1, 0xf2, 0x8b, 0x02, 0x21, 0x9d, 0x43, 0xba, 0xe3, 0xce,
+	0xdd, 0x26, 0x22, 0x5e, 0xc5, 0x5b, 0xfe, 0x63, 0x80, 0xb0, 0x6a, 0xa7, 0x5c, 0xf0, 0x92, 0x9a,
+	0xdd, 0xe5, 0x6a, 0xae, 0xc6, 0xa7, 0x90, 0x3d, 0xb0, 0x02, 0xcf, 0xee, 0x5f, 0x44, 0x5e, 0x82,
+	0x3c, 0x4e, 0x1e, 0x6f, 0x56, 0x96, 0xaa, 0x41, 0x69, 0x79, 0x1e, 0x62, 0x3a, 0x23, 0xdb, 0x11,
+	0xa1, 0x25, 0x43, 0x83, 0xbe, 0xfd, 0xdb, 0x96, 0x6c, 0x36, 0xb8, 0x87, 0x71, 0x8f, 0x85, 0x2a,
+	0x52, 0x86, 0x45, 0x9f, 0x42, 0xaf, 0xc8, 0x24, 0x93, 0xbf, 0xc9, 0xa4, 0xc3, 0x3c, 0x95, 0xdf,
+	0x45, 0x15, 0xe8, 0xc7, 0x50, 0x96, 0x78, 0x0a, 0x4f, 0x7e, 0x03, 0x53, 0x3e, 0xe1, 0xea, 0xae,
+	0x42, 0x65, 0xaf, 0xd3, 0x7c, 0x87, 0x89, 0x51, 0xab, 0xdd, 0xed, 0xa9, 0x7b, 0x26, 0xa9, 0x6c,
+	0x55, 0xc2, 0x3b, 0xc7, 0x2d, 0xf9, 0xa1, 0x71, 0x04, 0xab, 0xbf, 0x6c, 0x33, 0x5e, 0x4a, 0x83,
+	0x1d, 0x75, 0xdb, 0x87, 0x87, 0x08, 0x4b, 0x3f, 0xf9, 0xcb, 0x04, 0x14, 0xa2, 0x0a, 0x58, 0x19,
+	0x56, 0xf8, 0x66, 0x89, 0x6b, 0xbf, 0xa6, 0x75, 0xb2, 0x94, 0x8c, 0x29, 0x48, 0xa7, 0x4b, 0xa0,
+	0x6f, 0x85, 0x48, 0x6a, 0xb3, 0x44, 0x08, 0x91, 0x5f, 0xca, 0x96, 0xf3, 0xe1, 0xb4, 0x57, 0xcd,
+	0x56, 0xf3, 0xe8, 0x0d, 0x57, 0x0a, 0xd6, 0xa0, 0x28, 0x40, 0xa2, 0xa4, 0x91, 0x0a, 0x01, 0x34,
+	0x8b, 0x68, 0xa1, 0x93, 0xc1, 0x80, 0x7d, 0x8a, 0x2c, 0x19, 0x34, 0x02, 0xe0, 0x9f, 0xa2, 0x6e,
+	0x90, 0x7b, 0x79, 0x0b, 0xd6, 0x5d, 0x6f, 0xb8, 0x45, 0x37, 0x9d, 0x33, 0x2b, 0x14, 0xe8, 0xcb,
+	0xac, 0x68, 0x79, 0xff, 0xef, 0x00, 0x00, 0x00, 0xff, 0xff, 0x1c, 0xb3, 0xa7, 0xf9, 0x49, 0x40,
+	0x00, 0x00,
 }

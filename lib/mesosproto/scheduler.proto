@@ -1,26 +1,24 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 import "mesos.proto";
 
-package mesosproto;
+package mesos.v1.scheduler;
 
-option java_package = "org.apache.mesosproto.scheduler";
+option java_package = "org.apache.mesos.v1.scheduler";
 option java_outer_classname = "Protos";
 
 
@@ -35,13 +33,21 @@ message Event {
   // Possible event types, followed by message definitions if
   // applicable.
   enum Type {
-    SUBSCRIBED = 1; // See 'Subscribed' below.
-    OFFERS = 2;     // See 'Offers' below.
-    RESCIND = 3;    // See 'Rescind' below.
-    UPDATE = 4;     // See 'Update' below.
-    MESSAGE = 5;    // See 'Message' below.
-    FAILURE = 6;    // See 'Failure' below.
-    ERROR = 7;      // See 'Error' below.
+    // This must be the first enum value in this list, to
+    // ensure that if 'type' is not set, the default value
+    // is UNKNOWN. This enables enum values to be added
+    // in a backwards-compatible way. See: MESOS-4997.
+    UNKNOWN = 0;
+
+    SUBSCRIBED = 1;             // See 'Subscribed' below.
+    OFFERS = 2;                 // See 'Offers' below.
+    INVERSE_OFFERS = 9;         // See 'InverseOffers' below.
+    RESCIND = 3;                // See 'Rescind' below.
+    RESCIND_INVERSE_OFFER = 10; // See 'RescindInverseOffer' below.
+    UPDATE = 4;                 // See 'Update' below.
+    MESSAGE = 5;                // See 'Message' below.
+    FAILURE = 6;                // See 'Failure' below.
+    ERROR = 7;                  // See 'Error' below.
 
     // Periodic message sent by the Mesos master according to
     // 'Subscribed.heartbeat_interval_seconds'. If the scheduler does
@@ -59,17 +65,26 @@ message Event {
 
     // This value will be set if the master is sending heartbeats. See
     // the comment above on 'HEARTBEAT' for more details.
-    // TODO(vinod): Implement heartbeats in the master once the master
-    // can send HTTP events.
     optional double heartbeat_interval_seconds = 2;
   }
 
   // Received whenever there are new resources that are offered to the
-  // scheduler. Each offer corresponds to a set of resources on a
+  // scheduler. Each offer corresponds to a set of resources on an
   // agent. Until the scheduler accepts or declines an offer the
   // resources are considered allocated to the scheduler.
   message Offers {
     repeated Offer offers = 1;
+  }
+
+  // Received whenever there are resources requested back from the
+  // scheduler. Each inverse offer specifies the agent, and
+  // optionally specific resources. Accepting or Declining an inverse
+  // offer informs the allocator of the scheduler's ability to release
+  // the specified resources without violating an SLA. If no resources
+  // are specified then all resources on the agent are requested to be
+  // released.
+  message InverseOffers {
+    repeated InverseOffer inverse_offers = 1;
   }
 
   // Received when a particular offer is no longer valid (e.g., the
@@ -78,6 +93,15 @@ message Event {
   // by the scheduler regarding this offer will be invalid.
   message Rescind {
     required OfferID offer_id = 1;
+  }
+
+  // Received when a particular inverse offer is no longer valid
+  // (e.g., the agent corresponding to the offer has been removed)
+  // and hence needs to be rescinded. Any future calls ('Accept' /
+  // 'Decline') made by the scheduler regarding this inverse offer
+  // will be invalid.
+  message RescindInverseOffer {
+    required OfferID inverse_offer_id = 1;
   }
 
   // Received whenever there is a status update that is generated by
@@ -104,7 +128,7 @@ message Event {
     required bytes data = 3;
   }
 
-  // Received when a agent is removed from the cluster (e.g., failed
+  // Received when an agent is removed from the cluster (e.g., failed
   // health checks) or when an executor is terminated. Note that, this
   // event coincides with receipt of terminal UPDATE events for any
   // active tasks belonging to the agent or executor and receipt of
@@ -124,24 +148,23 @@ message Event {
     optional int32 status = 3;
   }
 
-  // Received when an invalid framework (e.g., unauthenticated,
-  // unauthorized) attempts to subscribe with the master. Error can
-  // also be received if scheduler sends invalid Calls (e.g., not
-  // properly initialized).
-  // TODO(vinod): Remove this once the old scheduler driver is no
-  // longer supported. With HTTP API all errors will be signaled via
-  // HTTP response codes.
+  // Received when there is an unrecoverable error in the scheduler (e.g.,
+  // scheduler failed over, rate limiting, authorization errors etc.). The
+  // scheduler should abort on receiving this event.
   message Error {
     required string message = 1;
   }
 
   // Type of the event, indicates which optional field below should be
   // present if that type has a nested message definition.
-  required Type type = 1;
+  // Enum fields should be optional, see: MESOS-4997.
+  optional Type type = 1;
 
   optional Subscribed subscribed = 2;
   optional Offers offers = 3;
+  optional InverseOffers inverse_offers = 9;
   optional Rescind rescind = 4;
+  optional RescindInverseOffer rescind_inverse_offer = 10;
   optional Update update = 5;
   optional Message message = 6;
   optional Failure failure = 7;
@@ -159,10 +182,15 @@ message Call {
   // Possible call types, followed by message definitions if
   // applicable.
   enum Type {
+    // See comments above on `Event::Type` for more details on this enum value.
+    UNKNOWN = 0;
+
     SUBSCRIBE = 1;   // See 'Subscribe' below.
     TEARDOWN = 2;    // Shuts down all tasks/executors and removes framework.
     ACCEPT = 3;      // See 'Accept' below.
     DECLINE = 4;     // See 'Decline' below.
+    ACCEPT_INVERSE_OFFERS = 13;  // See 'AcceptInverseOffers' below.
+    DECLINE_INVERSE_OFFERS = 14; // See 'DeclineInverseOffers' below.
     REVIVE = 5;      // Removes any previous filters set via ACCEPT or DECLINE.
     KILL = 6;        // See 'Kill' below.
     SHUTDOWN = 7;    // See 'Shutdown' below.
@@ -170,6 +198,7 @@ message Call {
     RECONCILE = 9;   // See 'Reconcile' below.
     MESSAGE = 10;    // See 'Message' below.
     REQUEST = 11;    // See 'Request' below.
+    SUPPRESS = 12;   // Inform master to stop sending offers to the framework.
 
     // TODO(benh): Consider adding an 'ACTIVATE' and 'DEACTIVATE' for
     // already subscribed frameworks as a way of stopping offers from
@@ -187,21 +216,6 @@ message Call {
     // See the comments below on 'framework_id' on the semantics for
     // 'framework_info.id'.
     required FrameworkInfo framework_info = 1;
-
-    // 'force' field is only relevant when 'framework_info.id' is set.
-    // It tells the master what to do in case an instance of the
-    // scheduler attempts to subscribe when another instance of it is
-    // already connected (e.g., split brain due to network partition).
-    // If 'force' is true, this scheduler instance is allowed and the
-    // old connected scheduler instance is disconnected. If false,
-    // this scheduler instance is disallowed subscription in favor of
-    // the already connected scheduler instance.
-    //
-    // It is recommended to set this to true only when a newly elected
-    // scheduler instance is attempting to subscribe but not when a
-    // scheduler is retrying subscription (e.g., disconnection or
-    // master failover; see sched/sched.cpp for an example).
-    optional bool force = 2;
   }
 
   // Accepts an offer, performing the specified operations
@@ -240,6 +254,22 @@ message Call {
     optional Filters filters = 2;
   }
 
+  // Accepts an inverse offer. Inverse offers should only be accepted
+  // if the resources in the offer can be safely evacuated before the
+  // provided unavailability.
+  message AcceptInverseOffers {
+    repeated OfferID inverse_offer_ids = 1;
+    optional Filters filters = 2;
+  }
+
+  // Declines an inverse offer. Inverse offers should be declined if
+  // the resources in the offer might not be safely evacuated before
+  // the provided unavailability.
+  message DeclineInverseOffers {
+    repeated OfferID inverse_offer_ids = 1;
+    optional Filters filters = 2;
+  }
+
   // Kills a specific task. If the scheduler has a custom executor,
   // the kill is forwarded to the executor and it is up to the
   // executor to kill the task and send a TASK_KILLED (or TASK_FAILED)
@@ -250,6 +280,11 @@ message Call {
   message Kill {
     required TaskID task_id = 1;
     optional AgentID agent_id = 2;
+
+    // If set, overrides any previously specified kill policy for this task.
+    // This includes 'TaskInfo.kill_policy' and 'Executor.kill.kill_policy'.
+    // Can be used to forcefully kill a task which is already being killed.
+    optional KillPolicy kill_policy = 3;
   }
 
   // Shuts down a custom executor. When the executor gets a shutdown
@@ -307,7 +342,7 @@ message Call {
   // NOTE: The built-in hierarchical allocator doesn't have support
   // for this call and hence simply ignores it.
   message Request {
-    repeated mesosproto.Request requests = 1;
+    repeated mesos.v1.Request requests = 1;
   }
 
   // Identifies who generated this call. Master assigns a framework id
@@ -320,11 +355,14 @@ message Call {
 
   // Type of the call, indicates which optional field below should be
   // present if that type has a nested message definition.
-  required Type type = 2;
+  // See comments on `Event::Type` above on the reasoning behind this field being optional.
+  optional Type type = 2;
 
   optional Subscribe subscribe = 3;
   optional Accept accept = 4;
   optional Decline decline = 5;
+  optional AcceptInverseOffers accept_inverse_offers = 13;
+  optional DeclineInverseOffers decline_inverse_offers = 14;
   optional Kill kill = 6;
   optional Shutdown shutdown = 7;
   optional Acknowledge acknowledge = 8;

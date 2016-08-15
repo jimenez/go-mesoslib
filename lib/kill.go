@@ -1,12 +1,15 @@
 package lib
 
-import "github.com/jimenez/mesoscon-demo/lib/mesosproto"
+import (
+	"github.com/jimenez/mesoscon-demo/lib/mesosproto"
+	"github.com/jimenez/mesoscon-demo/lib/mesosproto/schedulerproto"
+)
 
 func (lib *DemoLib) KillTask(taskId string) error {
-	call := &mesosproto.Call{
+	call := &schedulerproto.Call{
 		FrameworkId: lib.frameworkID,
-		Type:        mesosproto.Call_KILL.Enum(),
-		Kill: &mesosproto.Call_Kill{
+		Type:        schedulerproto.Call_KILL.Enum(),
+		Kill: &schedulerproto.Call_Kill{
 			AgentId: lib.tasks[taskId],
 			TaskId: &mesosproto.TaskID{
 				Value: &taskId,

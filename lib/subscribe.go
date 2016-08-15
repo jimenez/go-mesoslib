@@ -5,17 +5,17 @@ import (
 	"io"
 	"log"
 
-	"github.com/jimenez/mesoscon-demo/lib/mesosproto"
+	"github.com/jimenez/mesoscon-demo/lib/mesosproto/schedulerproto"
 )
 
 func (lib *DemoLib) handleEvents(body io.ReadCloser, handler OfferHandler) {
 	dec := json.NewDecoder(body)
 	for {
-		var event mesosproto.Event
+		var event schedulerproto.Event
 		if err := dec.Decode(&event); err != nil || event.Type == nil {
 			continue
 		}
-		if event.GetType() == mesosproto.Event_UPDATE {
+		if event.GetType() == schedulerproto.Event_UPDATE {
 			taskStatus := event.GetUpdate().GetStatus()
 			lib.tasks[taskStatus.GetTaskId().GetValue()] = taskStatus.GetAgentId()
 			log.Println("Status for", taskStatus.GetTaskId().GetValue(), "on", taskStatus.GetAgentId().GetValue(), "is", taskStatus.GetState().String())
@@ -25,10 +25,10 @@ func (lib *DemoLib) handleEvents(body io.ReadCloser, handler OfferHandler) {
 		}
 
 		switch event.GetType() {
-		case mesosproto.Event_SUBSCRIBED:
+		case schedulerproto.Event_SUBSCRIBED:
 			lib.frameworkID = event.GetSubscribed().GetFrameworkId()
 			log.Println("framework", lib.name, "subscribed succesfully (", lib.frameworkID.String(), ")")
-		case mesosproto.Event_OFFERS:
+		case schedulerproto.Event_OFFERS:
 			for _, offer := range event.GetOffers().GetOffers() {
 				handler(offer)
 			}
@@ -38,9 +38,9 @@ func (lib *DemoLib) handleEvents(body io.ReadCloser, handler OfferHandler) {
 }
 
 func (lib *DemoLib) Subscribe(handler OfferHandler) error {
-	call := &mesosproto.Call{
-		Type: mesosproto.Call_SUBSCRIBE.Enum(),
-		Subscribe: &mesosproto.Call_Subscribe{
+	call := &schedulerproto.Call{
+		Type: schedulerproto.Call_SUBSCRIBE.Enum(),
+		Subscribe: &schedulerproto.Call_Subscribe{
 			FrameworkInfo: lib.frameworkInfo,
 		},
 	}
