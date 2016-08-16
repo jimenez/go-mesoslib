@@ -29,7 +29,7 @@ func (lib *ExecutorLib) handleEvents(body io.ReadCloser, handler TaskHandler) {
 			lib.agent = event.GetSubscribed().GetAgentInfo()
 			log.Println("executor", lib.name, "subscribed succesfully (", lib.executorID.String(), ")")
 		case executorproto.Event_MESSAGE:
-			lib.message(event.GetData())
+			handler(taskInfo, event.GetType())
 		case executorproto.Event_LAUNCH:
 			taskInfo := event.GetTask()
 			lib.tasks[tasInfo.GetTaskId().GetValue()] = taskInfo
@@ -37,7 +37,7 @@ func (lib *ExecutorLib) handleEvents(body io.ReadCloser, handler TaskHandler) {
 				logrus.Errorf("Update task state as RUNNING failed")
 			}
 			tasksUnAkowledge[taskInfo.GetTaskId().GetValue()] = taskInfo
-			handler(taskInfo)
+			handler(taskInfo, event.GetType())
 		case executorproto.Event_KILL:
 			taskInfo := event.GetTask()
 			delete(lib.tasks, tasInfo.GetTaskId().GetValue())
@@ -45,7 +45,7 @@ func (lib *ExecutorLib) handleEvents(body io.ReadCloser, handler TaskHandler) {
 				logrus.Errorf("Update task state as KILLED failed")
 			}
 			tasksUnAkowledge[taskInfo.GetTaskId().GetValue()] = taskInfo
-			handler(taskInfo)
+			handler(taskInfo, event.GetType())
 		case executorproto.Event_ERROR:
 			continue
 		}
