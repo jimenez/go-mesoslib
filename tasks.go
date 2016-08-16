@@ -16,10 +16,11 @@ type Volume struct {
 }
 
 type Task struct {
-	ID      string
-	Command []string
-	Image   string
-	Volumes []*Volume
+	ID       string
+	Command  []string
+	Image    string
+	Volumes  []*Volume
+	Executor *mesosproto.ExecutorInfo
 }
 
 func NewTask(image string, command []string) *Task {
@@ -46,6 +47,7 @@ func CreateTaskInfo(offer *mesosproto.Offer, resources []*mesosproto.Resource, t
 		AgentId:   offer.AgentId,
 		Resources: resources,
 		Command:   &mesosproto.CommandInfo{},
+		Executor:  task.ExecutorInfo,
 	}
 
 	// Set value only if provided
