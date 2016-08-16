@@ -34,8 +34,10 @@ func (c *client) handleTasks(task *mesosproto.TaskInfo, event *executorproto.Eve
 func main() {
 	agent := flag.String("-agent", "localhost:5051", "Mesos Agent to connect to")
 
-	frameworkID := flag.String("-framework_id", "", "Id of Mesos Framework using the executor")
-	executorID := flag.String("-executor_id", "", "Id of Mesos Executor")
+	frameworkID := flag.String("framework_id", "", "Id of Mesos Framework using the executor")
+	executorID := flag.String("executor_id", "", "Id of Mesos Executor")
+
+	flag.Parse()
 
 	demoClient := client{lib: executor.New(*agent, "demo-executor", frameworkID, executorID)}
 

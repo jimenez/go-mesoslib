@@ -28,6 +28,7 @@ func (c *client) handleOffers(offer *mesosproto.Offer) {
 
 func main() {
 	master := flag.String("-master", "localhost:5050", "Mesos Master to connect to")
+	flag.Parse()
 	demoClient := client{lib: scheduler.New(*master, "mesoscon-demo")}
 	if err := demoClient.lib.Subscribe(demoClient.handleOffers); err != nil {
 		log.Fatal(err)

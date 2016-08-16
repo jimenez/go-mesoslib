@@ -22,7 +22,6 @@ func (lib *ExecutorLib) handleEvents(body io.ReadCloser, handler TaskHandler) {
 			taskInfo := lib.tasks[taskID.GetValue()]
 			log.Println("Status for", taskID.GetValue(), "on agent: ", taskInfo.GetAgentId().GetValue(), "is acknowledged")
 			// TODO: mutex this instruction => delete(lib.tasksUnAkowledge, taskID.GetValue())
-			return
 		}
 
 		switch event.GetType() {
