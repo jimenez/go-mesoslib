@@ -18,53 +18,66 @@ func (lib *ExecutorLib) handleEvents(body io.ReadCloser, handler TaskHandler) {
 			continue
 		}
 		if event.GetType() == executorproto.Event_ACKNOWLEDGED {
-			taskID := event.GetTaskId()
-			taskInfo = lib.tasks[taskID.GetValue()]
+			taskID := event.GetAcknowledged().GetTaskId()
+			taskInfo := lib.tasks[taskID.GetValue()]
 			log.Println("Status for", taskID.GetValue(), "on agent: ", taskInfo.GetAgentId().GetValue(), "is acknowledged")
-			delete(lib.tasksUnAkowledge, taskID.GetValue())
+			// TODO: mutex this instruction => delete(lib.tasksUnAkowledge, taskID.GetValue())
+			return
 		}
 
 		switch event.GetType() {
 		case executorproto.Event_SUBSCRIBED:
-			lib.agent = event.GetSubscribed().GetAgentInfo()
+			// TODO: check that event.GetSubscribed().GetAgentInfo() corresponds to correct info
 			log.Println("executor", lib.name, "subscribed succesfully (", lib.executorID.String(), ")")
 		case executorproto.Event_MESSAGE:
-			handler(taskInfo, event.GetType())
+			if err := handler(nil, &event); err != nil {
+				logrus.Error(err)
+			}
 		case executorproto.Event_LAUNCH:
-			taskInfo := event.GetTask()
-			lib.tasks[tasInfo.GetTaskId().GetValue()] = taskInfo
-			if err := lib.update(taskInfo.GetTaskId(), &mesosproto.TaskState_TASK_RUNNING); err != nil {
-				logrus.Errorf("Update task state as RUNNING failed")
+			taskInfo := event.GetLaunch().GetTask()
+			lib.tasks[taskInfo.GetTaskId().GetValue()] = taskInfo
+			state := mesosproto.TaskState_TASK_RUNNING
+			if err := handler(taskInfo, &event); err != nil {
+				logrus.Error(err)
+				state = mesosproto.TaskState_TASK_ERROR
 			}
-			tasksUnAkowledge[taskInfo.GetTaskId().GetValue()] = taskInfo
-			handler(taskInfo, event.GetType())
+			if err := lib.update(taskInfo, &state); err != nil {
+				logrus.Errorf("Update task state as %s failed: %v", state.String(), err)
+			}
+			lib.tasksUnAcknowledge[taskInfo.GetTaskId().GetValue()] = taskInfo
+
 		case executorproto.Event_KILL:
-			taskInfo := event.GetTask()
-			delete(lib.tasks, tasInfo.GetTaskId().GetValue())
-			if err := lib.update(taskInfo.GetTaskId(), &mesosproto.TaskState_TASK_KILLED); err != nil {
-				logrus.Errorf("Update task state as KILLED failed")
+			taskID := event.GetKill().GetTaskId()
+			taskInfo := lib.tasks[taskID.GetValue()]
+			state := mesosproto.TaskState_TASK_KILLED
+			if err := handler(taskInfo, &event); err != nil {
+				logrus.Error(err)
+				state = mesosproto.TaskState_TASK_ERROR
+
 			}
-			tasksUnAkowledge[taskInfo.GetTaskId().GetValue()] = taskInfo
-			handler(taskInfo, event.GetType())
-		case executorproto.Event_ERROR:
-			continue
+			if err := lib.update(taskInfo, &state); err != nil {
+				logrus.Errorf("Update task state as %s failed: %v", state.String(), err)
+			}
+			lib.tasksUnAcknowledge[taskInfo.GetTaskId().GetValue()] = taskInfo
+
+			// TODO: mutex this delete in a task.go method
+			delete(lib.tasks, taskInfo.GetTaskId().GetValue())
 		}
 	}
 }
 
 func (lib *ExecutorLib) Subscribe(handler TaskHandler) error {
 	call := &executorproto.Call{
-		Type: executorproto.Call_SUBSCRIBE.Enum(),
-		Subscribe: &executorproto.Call_Subscribe{
-			FrameworkId: lib.frameworkID,
-			ExecutorId:  lib.executorID,
-		},
+		Type:        executorproto.Call_SUBSCRIBE.Enum(),
+		Subscribe:   &executorproto.Call_Subscribe{},
+		FrameworkId: lib.frameworkID,
+		ExecutorId:  lib.executorID,
 	}
 
 	body, err := lib.send(call, 200)
 	if err != nil {
 		return err
 	}
-	go lib.handleEvents(body, handler)
+	lib.handleEvents(body, handler)
 	return nil
 }

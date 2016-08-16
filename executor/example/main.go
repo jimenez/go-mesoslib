@@ -2,9 +2,10 @@ package main
 
 import (
 	"flag"
-	"log"
+
 	"sync"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/jimenez/go-mesoslib/executor"
 	"github.com/jimenez/go-mesoslib/mesosproto"
 	"github.com/jimenez/go-mesoslib/mesosproto/executorproto"
@@ -16,15 +17,18 @@ type client struct {
 	lib   *executor.ExecutorLib
 }
 
-func (c *client) handleTasks(task *mesosproto.TaskInfo, event executorproto.Event_Type) {
+func (c *client) handleTasks(task *mesosproto.TaskInfo, event *executorproto.Event) error {
 	c.Lock()
-	switch event {
+	switch event.GetType() {
 	case executorproto.Event_MESSAGE:
-
+		log.Info("MESSAGE RECEIVED with: %v", event.GetMessage().GetData())
 	case executorproto.Event_LAUNCH:
+		log.Info("LAUNCH RECEIVED for task: %v", event.GetLaunch().GetTask().GetTaskId().GetValue())
 	case executorproto.Event_KILL:
+		log.Info("KILL RECEIVED for task: %v", event.GetKill().GetTaskId().GetValue())
 	}
 	c.Unlock()
+	return nil
 }
 
 func main() {
@@ -32,10 +36,9 @@ func main() {
 
 	frameworkID := flag.String("-framework_id", "", "Id of Mesos Framework using the executor")
 	executorID := flag.String("-executor_id", "", "Id of Mesos Executor")
-	hostname := "localhost"
-	port := "5051"
 
-	demoClient := client{lib: executor.New("demo-executor", *frameworkID, *executorID, hostname, port)}
+	demoClient := client{lib: executor.New(*agent, "demo-executor", frameworkID, executorID)}
+
 	if err := demoClient.lib.Subscribe(demoClient.handleTasks); err != nil {
 		log.Fatal(err)
 	}

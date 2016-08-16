@@ -8,26 +8,23 @@ import (
 const ENDPOINT = "/api/v1/executor"
 
 type ExecutorLib struct {
-	name             string
-	agent            *mesosproto.AgentInfo
-	frameworkID      *mesosproto.FrameworkID
-	executorID       *mesosproto.ExecutorID
-	tasks            map[string]*mesosproto.TaskInfo
-	tasksUnAkowledge map[string]*mesosproto.TaskInfo
+	name               string
+	agent              string
+	frameworkID        *mesosproto.FrameworkID
+	executorID         *mesosproto.ExecutorID
+	tasks              map[string]*mesosproto.TaskInfo
+	tasksUnAcknowledge map[string]*mesosproto.TaskInfo
 }
 
-func New(name, frameworkId, executorId, hostname string, port int32) *ExecutorLib {
-	fID := frameworkId
-	eID := executorId
-	hn := hotname
-	p := port
+func New(agent, name string, frameworkId, executorId *string) *ExecutorLib {
 	return &ExecutorLib{
-		name:        name,
-		agent:       &mesosproto.AgentInfo{Hostname: &hn, Port: &p},
-		frameworkID: &mesosproto.FrameworkID{Value: &fID},
-		executorID:  &mesosproto.ExecutorID{Value: &eID},
-		tasks:       make(map[string]*mesosproto.TaskInfo),
+		name:               name,
+		agent:              agent,
+		frameworkID:        &mesosproto.FrameworkID{Value: frameworkId},
+		executorID:         &mesosproto.ExecutorID{Value: executorId},
+		tasks:              make(map[string]*mesosproto.TaskInfo),
+		tasksUnAcknowledge: make(map[string]*mesosproto.TaskInfo),
 	}
 }
 
-type TaskHandler func(task *mesosproto.TaskInfo, event executorproto.Event_Type)
+type TaskHandler func(task *mesosproto.TaskInfo, event *executorproto.Event) error

@@ -23,6 +23,7 @@ func (lib *SchedulerLib) handleEvents(body io.ReadCloser, handler OfferHandler) 
 			if taskStatus.GetUuid() != nil {
 				lib.Acknowledge(taskStatus.GetTaskId(), taskStatus.GetAgentId(), taskStatus.GetUuid())
 			}
+			return
 		}
 
 		switch event.GetType() {

@@ -47,7 +47,7 @@ func CreateTaskInfo(offer *mesosproto.Offer, resources []*mesosproto.Resource, t
 		AgentId:   offer.AgentId,
 		Resources: resources,
 		Command:   &mesosproto.CommandInfo{},
-		Executor:  task.ExecutorInfo,
+		Executor:  task.Executor,
 	}
 
 	// Set value only if provided

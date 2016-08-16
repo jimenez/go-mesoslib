@@ -7,17 +7,17 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/gogo/protobuf/proto"
+	"github.com/golang/protobuf/proto"
 	"github.com/jimenez/go-mesoslib/mesosproto/executorproto"
 )
 
-func (lib *executorLib) send(call *executorproto.Call, statusExpected int) (io.ReadCloser, error) {
+func (lib *ExecutorLib) send(call *executorproto.Call, statusExpected int) (io.ReadCloser, error) {
 	body, err := proto.Marshal(call)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", "http://"+lib.agent.GetHostname()+lib.agent.GetPort()+ENDPOINT, bytes.NewReader(body))
+	req, err := http.NewRequest("POST", "http://"+lib.agent+ENDPOINT, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}

@@ -5,7 +5,7 @@ import (
 	"github.com/jimenez/go-mesoslib/mesosproto/executorproto"
 )
 
-func (lib *ExecutorLib) update(task *mesosproto.TaskInfo, state *TaskState) {
+func (lib *ExecutorLib) update(task *mesosproto.TaskInfo, state *mesosproto.TaskState) error {
 	call := &executorproto.Call{
 		FrameworkId: lib.frameworkID,
 		ExecutorId:  lib.executorID,
