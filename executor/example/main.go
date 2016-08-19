@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
@@ -24,7 +25,7 @@ func createOCIbundleAndRun(taskId, containerImage string) error {
 	// create the top most bundle and rootfs directory
 	log.Infof("Creating OCI bundle for %s with image: %s", taskId, containerImage)
 	dirPath := fmt.Sprintf("%s/%s", taskId, containerImage)
-	os.MkdirAll(dirPath+"rootfs", 0777)
+	os.MkdirAll(dirPath+"/rootfs", 0777)
 
 	// export image via Docker into the rootfs directory
 	log.Infof("Exporting image with Docker: %#v", containerImage)
@@ -41,25 +42,34 @@ func createOCIbundleAndRun(taskId, containerImage string) error {
 	// _ = cmd2.Start()
 	err := cmd.Run()
 	if err != nil {
+		log.Infof("ERROR cmd exec %#v:", err)
 		log.Fatal(err)
 		return err
 	}
 	//	_ = cmd2.Wait()
 
 	// create runc spec
-	log.Info("Exporting image with Docker: %#v", dirPath)
+	log.Infof("Creating spec for: %#v", dirPath)
 	cmd = exec.Command("runc", "spec", "-b", dirPath)
 	err = cmd.Run()
 	if err != nil {
+		log.Infof("ERROR cmd exec %#v:", err)
+
 		log.Fatal(err)
 		return err
 	}
 
 	// run container in runc
-	log.Info("Running container from image: %#v  with runc in: %#v", containerImage, dirPath)
+	log.Infof("Running container from image: %#v  with runc in: %#v", containerImage, dirPath)
 	cmd = exec.Command("runc", "run", "-b", dirPath, containerImage)
+	var stderr bytes.Buffer
+
+	cmd.Stderr = &stderr
+
 	err = cmd.Run()
+
 	if err != nil {
+		log.Infof("ERROR running : $s", fmt.Sprint(err)+": "+stderr.String())
 		log.Fatal(err)
 		return err
 	}
