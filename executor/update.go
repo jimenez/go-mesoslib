@@ -7,6 +7,7 @@ import (
 
 func (lib *ExecutorLib) update(task *mesosproto.TaskInfo, state *mesosproto.TaskState) error {
 	call := &executorproto.Call{
+		Type:        executorproto.Call_UPDATE.Enum(),
 		FrameworkId: lib.frameworkID,
 		ExecutorId:  lib.executorID,
 		Update: &executorproto.Call_Update{
