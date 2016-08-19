@@ -59,6 +59,17 @@ func createOCIbundleAndRun(taskId, containerImage string) error {
 		return err
 	}
 
+	// Editing the spec sed  's/\"terminal\": true,/\"terminal\": false/' config.json
+	log.Infof("Editing spec for: %#v", dirPath)
+	cmd = exec.Command("sh", "-c", "sed -i 's/\"terminal\": true,/\"terminal\": false,/' "+dirPath+"/config.json")
+	err = cmd.Run()
+	if err != nil {
+		log.Infof("ERROR cmd exec %#v:", err)
+
+		log.Fatal(err)
+		return err
+	}
+
 	// run container in runc
 	log.Infof("Running container from image: %#v  with runc in: %#v", containerImage, dirPath)
 	cmd = exec.Command("runc", "run", "-b", dirPath, containerImage)
