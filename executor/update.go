@@ -16,6 +16,7 @@ func (lib *ExecutorLib) update(task *mesosproto.TaskInfo, state *mesosproto.Task
 				TaskId: task.GetTaskId(),
 				State:  state,
 				Uuid:   uuid.NewUUID(),
+				Source: mesosproto.TaskStatus_SOURCE_EXECUTOR.Enum(),
 			},
 		},
 	}

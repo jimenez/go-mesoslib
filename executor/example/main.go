@@ -69,7 +69,7 @@ func createOCIbundleAndRun(taskId, containerImage string, args []string) error {
 	log.Infof("Editing spec for: %#v", dirPath)
 	comnd := strings.Join(args, "\", \"")
 	log.Infof("Command : %s", comnd)
-	cmd = exec.Command("sh", "-c", fmt.Sprintf("sed -i 's;\"sh\";\"/%s\";' %s", comnd, configPath))
+	cmd = exec.Command("sh", "-c", fmt.Sprintf("sed -i 's;\"sh\";\"%s\";' %s", comnd, configPath))
 	err = cmd.Run()
 	if err != nil {
 		log.Infof("ERROR cmd exec %#v:", err)
