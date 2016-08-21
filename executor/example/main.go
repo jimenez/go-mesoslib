@@ -27,8 +27,7 @@ func (c *client) createOCIbundleAndRun(taskId, containerImage, args string, task
 	log.Infof("Creating OCI bundle for %s with image: %s", taskId, containerImage)
 
 	// TODO: create path with something better than containerImage (ex: imageID or md5 of image)
-	dirPath := filepath.Join(taskId, containerImage)
-	rootPath := filepath.Join(dirPath, "rootfs")
+	rootPath := filepath.Join(taskId, "rootfs")
 	os.MkdirAll(rootPath, 0777)
 
 	// export image via Docker into the rootfs directory
@@ -42,8 +41,8 @@ func (c *client) createOCIbundleAndRun(taskId, containerImage, args string, task
 	}
 
 	// create runc spec
-	log.Infof("Creating spec for: %#v", dirPath)
-	cmd = exec.Command("runc", "spec", "-b", dirPath)
+	log.Infof("Creating spec for: %#v", taskId)
+	cmd = exec.Command("runc", "spec", "-b", taskId)
 	err = cmd.Run()
 	if err != nil {
 		log.Infof("ERROR cmd exec %#v:", err)
@@ -52,9 +51,9 @@ func (c *client) createOCIbundleAndRun(taskId, containerImage, args string, task
 		return err
 	}
 
-	configPath := filepath.Join(dirPath, "config.json")
+	configPath := filepath.Join(taskId, "config.json")
 	// Editing the spec sed  's/\"terminal\": true,/\"terminal\": false/' config.json
-	log.Infof("Editing spec for: %#v", dirPath)
+	log.Infof("Editing spec for: %#v", taskId)
 	cmd = exec.Command("sh", "-c", fmt.Sprintf("sed -i 's/\"terminal\": true,/\"terminal\": false,/' %s", configPath))
 	err = cmd.Run()
 	if err != nil {
@@ -76,12 +75,12 @@ func (c *client) createOCIbundleAndRun(taskId, containerImage, args string, task
 	}
 
 	// run container in runc
-	log.Infof("Running container from image: %#v  with runc in: %#v", containerImage, dirPath)
+	log.Infof("Running container from image: %#v  with runc in: %#v", containerImage, taskId)
 
 	// TODO: see comment for replacing the containerImage in the path
 	// as it can collide.
 	go func() {
-		cmd = exec.Command("runc", "run", "-b", dirPath, containerImage)
+		cmd = exec.Command("runc", "run", "-b", taskId, taskId)
 		var stderr bytes.Buffer
 
 		cmd.Stderr = &stderr
