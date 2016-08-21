@@ -43,7 +43,7 @@ func NewTask(image string, command []string) *Task {
 // Helper for task info object creation
 func CreateTaskInfo(offer *mesosproto.Offer, resources []*mesosproto.Resource, task *Task) *mesosproto.TaskInfo {
 	taskInfo := mesosproto.TaskInfo{
-		Name: proto.String(fmt.Sprintf("mesoscon-demo-task-%s", task.ID)),
+		Name: proto.String(fmt.Sprintf("container-demo-task-%s", task.ID)),
 		TaskId: &mesosproto.TaskID{
 			Value: &task.ID,
 		},
