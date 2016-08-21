@@ -123,7 +123,7 @@ func (c *client) handleTasks(task *mesosproto.TaskInfo, event *executorproto.Eve
 		if containerType := task.GetContainer().GetType(); containerType == mesosproto.ContainerInfo_DOCKER {
 			containerImage := task.GetContainer().GetDocker().GetImage()
 			log.Infof("LAUNCH RECEIVED for task: %#v for image %#v", taskId, containerImage)
-			args := task.GetCommand().GetArguments()
+			args := task.GetExecutor().GetCommand().GetArguments()
 			createOCIbundleAndRun(taskId, containerImage, args)
 		} else {
 			log.Error("Executor only supports Docker containers")
