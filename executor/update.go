@@ -36,7 +36,7 @@ func (lib *ExecutorLib) update(task *mesosproto.TaskInfo, state *mesosproto.Task
 			Status: &mesosproto.TaskStatus{
 				TaskId: task.GetTaskId(),
 				State:  state,
-				Uuid:   []byte("01234567-89ab-cdef-0123-456789abcdef"),
+				Uuid:   []byte("0123456789abcdef0123456789abcdef"),
 			},
 		},
 	}
