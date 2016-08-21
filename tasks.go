@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/davecgh/go-spew/spew"
@@ -52,7 +53,6 @@ func CreateTaskInfo(offer *mesosproto.Offer, resources []*mesosproto.Resource, t
 		Executor: task.Executor,
 	}
 
-	taskInfo.Executor.Command.Arguments = task.Command
 	// // Set value only if provided
 	// if task.Command[0] != "" {
 	// 	taskInfo.Command.Value = &task.Command[0]
@@ -64,11 +64,19 @@ func CreateTaskInfo(offer *mesosproto.Offer, resources []*mesosproto.Resource, t
 	// }
 
 	// Set the docker image if specified
+	cmd := "command"
+	args := strings.Join(task.Command, "\", \"")
 	if task.Image != "" {
 		taskInfo.Container = &mesosproto.ContainerInfo{
 			Type: mesosproto.ContainerInfo_DOCKER.Enum(),
 			Docker: &mesosproto.ContainerInfo_DockerInfo{
 				Image: &task.Image,
+				Parameters: []*mesosproto.Parameter{
+					&mesosproto.Parameter{
+						Key:   &cmd,
+						Value: &args,
+					},
+				},
 			},
 		}
 
