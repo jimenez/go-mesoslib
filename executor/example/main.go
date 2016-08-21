@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"sync"
 
@@ -24,29 +25,21 @@ type client struct {
 func createOCIbundleAndRun(taskId, containerImage string) error {
 	// create the top most bundle and rootfs directory
 	log.Infof("Creating OCI bundle for %s with image: %s", taskId, containerImage)
-	dirPath := fmt.Sprintf("%s/%s", taskId, containerImage)
-	os.MkdirAll(dirPath+"/rootfs", 0777)
+
+	// TODO: create path with something better than containerImage (ex: imageID or md5 of image)
+	dirPath := filepath.Join(taskId, containerImage)
+	rootPath := filepath.Join(dirPath, "rootfs")
+	os.MkdirAll(rootPath, 0777)
 
 	// export image via Docker into the rootfs directory
 	log.Infof("Exporting image with Docker: %#v", containerImage)
-	cmd := exec.Command("sh", "-c", "docker export $(docker create "+containerImage+")  | tar -C "+dirPath+"/rootfs -xvf -")
-	// cmd2 := exec.Command("tar", "-C", dirPath+"/rootfs", "-xvf", "-")
-
-	// stdout, err := cmd.StdoutPipe()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// cmd2.Stdin = stdout
-	// cmd2.Stdout = os.Stdout
-	// _ = cmd2.Start()
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("docker export $(docker create %s)  | tar -C %s -xvf -", containerImage, rootPath))
 	err := cmd.Run()
 	if err != nil {
 		log.Infof("ERROR cmd exec %#v:", err)
-		log.Fatal(err)
+		log.Error(err)
 		return err
 	}
-	//	_ = cmd2.Wait()
 
 	// create runc spec
 	log.Infof("Creating spec for: %#v", dirPath)
@@ -55,7 +48,7 @@ func createOCIbundleAndRun(taskId, containerImage string) error {
 	if err != nil {
 		log.Infof("ERROR cmd exec %#v:", err)
 
-		log.Fatal(err)
+		log.Error(err)
 		return err
 	}
 
@@ -66,12 +59,15 @@ func createOCIbundleAndRun(taskId, containerImage string) error {
 	if err != nil {
 		log.Infof("ERROR cmd exec %#v:", err)
 
-		log.Fatal(err)
+		log.Error(err)
 		return err
 	}
 
 	// run container in runc
 	log.Infof("Running container from image: %#v  with runc in: %#v", containerImage, dirPath)
+
+	// TODO: see comment for replacing the containerImage in the path
+	// as it can collide.
 	cmd = exec.Command("runc", "run", "-b", dirPath, containerImage)
 	var stderr bytes.Buffer
 
@@ -81,20 +77,22 @@ func createOCIbundleAndRun(taskId, containerImage string) error {
 
 	if err != nil {
 		log.Infof("ERROR running : $s", fmt.Sprint(err)+": "+stderr.String())
-		log.Fatal(err)
+		log.Error(err)
 		return err
 	}
-	log.Info("ALL RUNNING")
 	return nil
 }
 
 func runcKill(taskId, containerImage string) error {
 	// runc kill container
-	dirPath := fmt.Sprintf("/tmp/%s/%s", taskId, containerImage)
-	cmd := exec.Command(fmt.Sprintf("runc kill -b %s %s", dirPath, containerImage))
+
+	// TODO: create path with something better than containerImage (ex: imageID or md5 of image)
+	dirPath := filepath.Join(taskId, containerImage)
+
+	cmd := exec.Command("runc", "kill", "-b", dirPath, containerImage)
 	err := cmd.Run()
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		return err
 	}
 	return nil
@@ -113,7 +111,7 @@ func (c *client) handleTasks(task *mesosproto.TaskInfo, event *executorproto.Eve
 			log.Infof("LAUNCH RECEIVED for task: %#v for image %#v", taskId, containerImage)
 			createOCIbundleAndRun(taskId, containerImage)
 		} else {
-			log.Fatal("Executor only supports Docker containers")
+			log.Error("Executor only supports Docker containers")
 		}
 	case executorproto.Event_KILL:
 		log.Info("KILL RECEIVED for task: %v", event.GetKill().GetTaskId().GetValue())
@@ -122,43 +120,14 @@ func (c *client) handleTasks(task *mesosproto.TaskInfo, event *executorproto.Eve
 			containerImage := task.GetContainer().GetDocker().GetImage()
 			runcKill(taskId, containerImage)
 		} else {
-			log.Fatal("Executor only supports Docker containers")
+			log.Error("Executor only supports Docker containers")
 		}
 	}
 	c.Unlock()
 	return nil
 }
 
-func checkRunCinstalledorInstall() error {
-	cmd := exec.Command("runc", "-h")
-	err := cmd.Run()
-	if err != nil {
-		log.Info(" runc v1.0.0-rc1 DID NOT WORK")
-		log.Fatal(err)
-		return err
-		log.Info("Fetching runc v1.0.0-rc1")
-		cmd = exec.Command("wget", "https://github.com/opencontainers/runc/releases/download/v1.0.0-rc1/runc-linux-amd64")
-		err = cmd.Run()
-		if err != nil {
-			log.Fatal(err)
-			return err
-		}
-		os.Chmod("runc-linux-amd64", 111)
-		cmd = exec.Command("install", "-D", "-m0755", "runc-linux-amd64", "runc")
-		err = cmd.Run()
-		if err != nil {
-			log.Fatal(err)
-			return err
-		}
-	}
-	return nil
-}
-
 func main() {
-
-	if err := checkRunCinstalledorInstall(); err != nil {
-		log.Fatal(err)
-	}
 
 	agent := flag.String("-agent", "localhost:5051", "Mesos Agent to connect to")
 
@@ -172,7 +141,7 @@ func main() {
 		tasks: make(map[string]*mesosproto.TaskInfo)}
 
 	if err := demoClient.lib.Subscribe(demoClient.handleTasks); err != nil {
-		log.Fatal(err)
+		log.Error(err)
 	}
 
 }
