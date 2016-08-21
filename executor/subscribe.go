@@ -40,7 +40,7 @@ func (lib *ExecutorLib) handleEvents(body io.ReadCloser, handler TaskHandler) {
 				logrus.Error(err)
 				state = mesosproto.TaskState_TASK_ERROR
 			}
-			if err := lib.update(taskInfo, &state); err != nil {
+			if err := lib.Update(taskInfo, &state); err != nil {
 				logrus.Errorf("Update task state as %s failed: %v", state.String(), err)
 			}
 			lib.tasksUnAcknowledge[taskInfo.GetTaskId().GetValue()] = taskInfo
@@ -54,7 +54,7 @@ func (lib *ExecutorLib) handleEvents(body io.ReadCloser, handler TaskHandler) {
 				state = mesosproto.TaskState_TASK_ERROR
 
 			}
-			if err := lib.update(taskInfo, &state); err != nil {
+			if err := lib.Update(taskInfo, &state); err != nil {
 				logrus.Errorf("Update task state as %s failed: %v", state.String(), err)
 			}
 			lib.tasksUnAcknowledge[taskInfo.GetTaskId().GetValue()] = taskInfo

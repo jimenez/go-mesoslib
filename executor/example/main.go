@@ -22,7 +22,7 @@ type client struct {
 	lib   *executor.ExecutorLib
 }
 
-func createOCIbundleAndRun(taskId, containerImage, args string) error {
+func (c *client) createOCIbundleAndRun(taskId, containerImage, args string, taskInfo *mesosproto.TaskInfo) error {
 	// create the top most bundle and rootfs directory
 	log.Infof("Creating OCI bundle for %s with image: %s", taskId, containerImage)
 
@@ -80,18 +80,25 @@ func createOCIbundleAndRun(taskId, containerImage, args string) error {
 
 	// TODO: see comment for replacing the containerImage in the path
 	// as it can collide.
-	cmd = exec.Command("runc", "run", "-b", dirPath, containerImage)
-	var stderr bytes.Buffer
+	go func() {
+		cmd = exec.Command("runc", "run", "-b", dirPath, containerImage)
+		var stderr bytes.Buffer
 
-	cmd.Stderr = &stderr
+		cmd.Stderr = &stderr
 
-	err = cmd.Run()
+		err = cmd.Run()
+		state := mesosproto.TaskState_TASK_FINISHED
+		if err != nil {
+			log.Infof("ERROR running : $s", fmt.Sprint(err)+": "+stderr.String())
+			state = mesosproto.TaskState_TASK_FAILED
+			// TODO: send status update task failed
+		}
+		if err := c.lib.Update(taskInfo, &state); err != nil {
+			log.Errorf("Update task state as %s failed: %v", state.String(), err)
+		}
 
-	if err != nil {
-		log.Infof("ERROR running : $s", fmt.Sprint(err)+": "+stderr.String())
-		log.Error(err)
-		return err
-	}
+	}()
+
 	return nil
 }
 
@@ -122,7 +129,7 @@ func (c *client) handleTasks(task *mesosproto.TaskInfo, event *executorproto.Eve
 			containerImage := task.GetContainer().GetDocker().GetImage()
 			log.Infof("LAUNCH RECEIVED for task: %#v for image %#v", taskId, containerImage)
 			args := task.GetContainer().GetDocker().GetParameters()[0].GetValue()
-			createOCIbundleAndRun(taskId, containerImage, args)
+			c.createOCIbundleAndRun(taskId, containerImage, args, task)
 		} else {
 			log.Error("Executor only supports Docker containers")
 		}

@@ -6,7 +6,7 @@ import (
 	"github.com/pborman/uuid"
 )
 
-func (lib *ExecutorLib) update(task *mesosproto.TaskInfo, state *mesosproto.TaskState) error {
+func (lib *ExecutorLib) Update(task *mesosproto.TaskInfo, state *mesosproto.TaskState) error {
 	call := &executorproto.Call{
 		Type:        executorproto.Call_UPDATE.Enum(),
 		FrameworkId: lib.frameworkID,
