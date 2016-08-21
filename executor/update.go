@@ -24,10 +24,10 @@ func newUUID() (string, error) {
 }
 
 func (lib *ExecutorLib) update(task *mesosproto.TaskInfo, state *mesosproto.TaskState) error {
-	uuid, err := newUUID()
-	if err != nil {
-		return err
-	}
+	// uuid, err := newUUID()
+	// if err != nil {
+	// 	return err
+	// }
 	call := &executorproto.Call{
 		Type:        executorproto.Call_UPDATE.Enum(),
 		FrameworkId: lib.frameworkID,
@@ -36,10 +36,10 @@ func (lib *ExecutorLib) update(task *mesosproto.TaskInfo, state *mesosproto.Task
 			Status: &mesosproto.TaskStatus{
 				TaskId: task.GetTaskId(),
 				State:  state,
-				Uuid:   []byte(uuid),
+				Uuid:   []byte("test-abcd-ef-3455-454-001"),
 			},
 		},
 	}
-	_, err = lib.send(call, 202)
+	_, err := lib.send(call, 202)
 	return err
 }
