@@ -48,19 +48,20 @@ func CreateTaskInfo(offer *mesosproto.Offer, resources []*mesosproto.Resource, t
 		},
 		AgentId:   offer.AgentId,
 		Resources: resources,
-		Command:   &mesosproto.CommandInfo{},
-		Executor:  task.Executor,
+		//		Command:   &mesosproto.CommandInfo{},
+		Executor: task.Executor,
 	}
 
+	taskInfo.Executor.Command.Arguments = task.Command
 	// // Set value only if provided
 	// if task.Command[0] != "" {
 	// 	taskInfo.Command.Value = &task.Command[0]
 	// }
 
 	// Set args only if they exist
-	if len(task.Command) > 1 {
-		taskInfo.Command.Arguments = task.Command
-	}
+	// if len(task.Command) > 1 {
+	// 	taskInfo.Command.Arguments = task.Command
+	// }
 
 	// Set the docker image if specified
 	if task.Image != "" {
