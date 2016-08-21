@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"sync"
 
@@ -22,7 +23,7 @@ type client struct {
 	lib   *executor.ExecutorLib
 }
 
-func createOCIbundleAndRun(taskId, containerImage string) error {
+func createOCIbundleAndRun(taskId, containerImage string, args []string) error {
 	// create the top most bundle and rootfs directory
 	log.Infof("Creating OCI bundle for %s with image: %s", taskId, containerImage)
 
@@ -52,9 +53,22 @@ func createOCIbundleAndRun(taskId, containerImage string) error {
 		return err
 	}
 
+	configPath := filepath.Join(dirPath, "config.json")
 	// Editing the spec sed  's/\"terminal\": true,/\"terminal\": false/' config.json
 	log.Infof("Editing spec for: %#v", dirPath)
-	cmd = exec.Command("sh", "-c", "sed -i 's/\"terminal\": true,/\"terminal\": false,/' "+dirPath+"/config.json")
+	cmd = exec.Command("sh", "-c", fmt.Sprintf("sed -i 's/\"terminal\": true,/\"terminal\": false,/' %s", configPath))
+	err = cmd.Run()
+	if err != nil {
+		log.Infof("ERROR cmd exec %#v:", err)
+
+		log.Error(err)
+		return err
+	}
+
+	// Editing the spec for command
+	log.Infof("Editing spec for: %#v", dirPath)
+	comnd := "\"" + strings.Join(args, "\", \"") + "\""
+	cmd = exec.Command("sh", "-c", fmt.Sprintf("sed -i 's;\"sh\";\"/%s\";' %s", comnd, configPath))
 	err = cmd.Run()
 	if err != nil {
 		log.Infof("ERROR cmd exec %#v:", err)
@@ -109,7 +123,8 @@ func (c *client) handleTasks(task *mesosproto.TaskInfo, event *executorproto.Eve
 		if containerType := task.GetContainer().GetType(); containerType == mesosproto.ContainerInfo_DOCKER {
 			containerImage := task.GetContainer().GetDocker().GetImage()
 			log.Infof("LAUNCH RECEIVED for task: %#v for image %#v", taskId, containerImage)
-			createOCIbundleAndRun(taskId, containerImage)
+			args := task.GetCommand().GetArguments()
+			createOCIbundleAndRun(taskId, containerImage, args)
 		} else {
 			log.Error("Executor only supports Docker containers")
 		}
