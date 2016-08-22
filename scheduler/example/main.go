@@ -20,17 +20,21 @@ type client struct {
 	lib    *scheduler.SchedulerLib
 }
 
-func (c *client) handleOffers(offer *mesosproto.Offer) {
+func (c *client) handleOffer(offer *mesosproto.Offer) {
 	c.Lock()
 	c.offers = append(c.offers, offer)
 	c.Unlock()
+}
+
+func (c *client) handleTaskStatus(taskStatus *mesosproto.TaskStatus) {
+	log.Println("Status for", taskStatus.GetTaskId().GetValue(), "on", taskStatus.GetAgentId().GetValue(), "is", taskStatus.GetState().String())
 }
 
 func main() {
 	master := flag.String("-master", "localhost:5050", "Mesos Master to connect to")
 	flag.Parse()
 	demoClient := client{lib: scheduler.New(*master, "mesoscon-demo")}
-	if err := demoClient.lib.Subscribe(demoClient.handleOffers); err != nil {
+	if err := demoClient.lib.Subscribe(demoClient.handleOffer, demoClient.handleTaskStatus); err != nil {
 		log.Fatal(err)
 	}
 
