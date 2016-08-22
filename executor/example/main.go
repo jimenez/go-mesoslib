@@ -23,13 +23,16 @@ type client struct {
 	lib   *executor.ExecutorLib
 }
 
-func (c *client) createOCIbundleAndRun(taskId, containerImage, args string, taskInfo *mesosproto.TaskInfo) error {
+func (c *client) createOCIbundleAndRun(taskId, containerImage, args string, taskInfo *mesosproto.TaskInfo, restore bool) error {
 	// create the top most bundle and rootfs directory
 	log.Infof("Creating OCI bundle for %s with image: %s", taskId, containerImage)
 
-	// TODO: create path with something better than containerImage (ex: imageID or md5 of image)
 	rootPath := filepath.Join(taskId, "rootfs")
-	os.MkdirAll(rootPath, 0777)
+	if err := os.MkdirAll(rootPath, 0777); err != nil {
+		log.Infof("ERROR mkdir %#v:", err)
+		log.Error(err)
+		return err
+	}
 
 	// export image via Docker into the rootfs directory
 	log.Infof("Exporting image with Docker: %#v", containerImage)
@@ -93,10 +96,12 @@ func (c *client) createOCIbundleAndRun(taskId, containerImage, args string, task
 	// run container in runc
 	log.Infof("Running container from image: %#v  with runc in: %#v", containerImage, taskId)
 
-	// TODO: see comment for replacing the containerImage in the path
-	// as it can collide.
 	go func() {
-		cmd = exec.Command("runc", "run", "-b", taskId, taskId)
+		if !restore {
+			cmd = exec.Command("runc", "run", "-b", taskId, taskId)
+		} else {
+			cmd = exec.Command("runc", "restore", "--image-path", filepath.Join("/criu", taskId), taskId)
+		}
 		var stderr bytes.Buffer
 
 		cmd.Stderr = &stderr
@@ -163,11 +168,19 @@ func (c *client) handleTasks(task *mesosproto.TaskInfo, event *executorproto.Eve
 	case executorproto.Event_LAUNCH:
 		task := event.GetLaunch().GetTask()
 		taskId := task.GetTaskId().GetValue()
+		labels := task.GetLabels().GetLabels()
+		restoring := false
+		for _, label := range labels {
+			if label.GetKey() == "restore" && label.GetValue() == taskId {
+				restoring = true
+			}
+		}
 		if containerType := task.GetContainer().GetType(); containerType == mesosproto.ContainerInfo_DOCKER {
 			containerImage := task.GetContainer().GetDocker().GetImage()
 			log.Infof("LAUNCH RECEIVED for task: %#v for image %#v", taskId, containerImage)
 			args := task.GetContainer().GetDocker().GetParameters()[0].GetValue()
-			c.createOCIbundleAndRun(taskId, containerImage, args, task)
+
+			c.createOCIbundleAndRun(taskId, containerImage, args, task, restoring)
 		} else {
 			log.Error("Executor only supports Docker containers")
 		}
