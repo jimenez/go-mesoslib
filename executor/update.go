@@ -1,6 +1,9 @@
 package executor
 
 import (
+	"time"
+
+	"github.com/golang/protobuf/proto"
 	"github.com/jimenez/go-mesoslib/mesosproto"
 	"github.com/jimenez/go-mesoslib/mesosproto/executorproto"
 	"github.com/pborman/uuid"
@@ -13,10 +16,11 @@ func (lib *ExecutorLib) Update(task *mesosproto.TaskInfo, state *mesosproto.Task
 		ExecutorId:  lib.executorID,
 		Update: &executorproto.Call_Update{
 			Status: &mesosproto.TaskStatus{
-				TaskId: task.GetTaskId(),
-				State:  state,
-				Uuid:   uuid.NewUUID(),
-				Source: mesosproto.TaskStatus_SOURCE_EXECUTOR.Enum(),
+				Timestamp: proto.Float64(float64(time.Now().Unix())),
+				TaskId:    task.GetTaskId(),
+				State:     state,
+				Uuid:      uuid.NewUUID(),
+				Source:    mesosproto.TaskStatus_SOURCE_EXECUTOR.Enum(),
 			},
 		},
 	}
