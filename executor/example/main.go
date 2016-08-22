@@ -100,7 +100,7 @@ func (c *client) createOCIbundleAndRun(taskId, containerImage, args string, task
 		if !restore {
 			cmd = exec.Command("runc", "run", "-b", taskId, taskId)
 		} else {
-			cmd = exec.Command("runc", "restore", "--image-path", filepath.Join("/criu", taskId), taskId)
+			cmd = exec.Command("runc", "restore", "--image-path", filepath.Join("/criu", taskId), "-b", taskId, taskId)
 		}
 		var stderr bytes.Buffer
 
