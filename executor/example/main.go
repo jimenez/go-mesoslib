@@ -179,7 +179,7 @@ func (c *client) handleTasks(task *mesosproto.TaskInfo, event *executorproto.Eve
 
 func main() {
 
-	agent := flag.String("-agent", "localhost:5051", "Mesos Agent to connect to")
+	agent := flag.String("-agent", os.Getenv("AGENT_ADDR"), "Mesos Agent to connect to")
 
 	frameworkID := flag.String("framework_id", "", "Id of Mesos Framework using the executor")
 	executorID := flag.String("executor_id", "", "Id of Mesos Executor")
