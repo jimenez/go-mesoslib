@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"sync"
 
@@ -131,11 +132,26 @@ func runcKill(taskId, containerImage string) error {
 	return nil
 }
 
+func checkpointTask(data []byte) error {
+	taskId := strings.Split(" ", fmt.Sprintf("%s", data))[1]
+	cmd := exec.Command("runc", "checkpoint", "-b", taskId, "--image-path", "/criu/"+taskId, taskId)
+	err := cmd.Run()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	return nil
+}
+
 func (c *client) handleTasks(task *mesosproto.TaskInfo, event *executorproto.Event) error {
 	c.Lock()
 	switch event.GetType() {
 	case executorproto.Event_MESSAGE:
-		log.Info("MESSAGE RECEIVED with: %v", event.GetMessage().GetData())
+		data := event.GetMessage().GetData()
+		log.Info("MESSAGE RECEIVED with: %v", data)
+		if err := checkpointTask(data); err != nil {
+			log.Errorf("Executor checkpoint error: %#v", err)
+		}
 	case executorproto.Event_LAUNCH:
 		task := event.GetLaunch().GetTask()
 		taskId := task.GetTaskId().GetValue()
