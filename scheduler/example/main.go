@@ -77,6 +77,14 @@ func main() {
 			if err := demoClient.lib.KillTask(array[1]); err != nil {
 				log.Println("error:", err)
 			}
+		case "message":
+			if len(array) < 2 {
+				log.Println("error: not enough parameters (kill <taskId>)")
+				continue
+			}
+			if err := demoClient.lib.MessageTask(array[1], array[2], array[3]); err != nil {
+				log.Println("error:", err)
+			}
 		default:
 			log.Println("error: invalid command (launch, kill)")
 		}

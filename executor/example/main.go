@@ -42,34 +42,49 @@ func (c *client) createOCIbundleAndRun(taskId, containerImage, args string, task
 
 	// create runc spec
 	log.Infof("Creating spec for: %#v", taskId)
-	cmd = exec.Command("runc", "spec", "-b", taskId)
-	err = cmd.Run()
-	if err != nil {
-		log.Infof("ERROR cmd exec %#v:", err)
+	/*
+		cmd = exec.Command("runc", "spec", "-b", taskId)
+		err = cmd.Run()
+		if err != nil {
+			log.Infof("ERROR cmd exec %#v:", err)
 
+			log.Error(err)
+			return err
+		}
+
+		configPath := filepath.Join(taskId, "config.json")
+		// Editing the spec sed  's/\"terminal\": true,/\"terminal\": false/' config.json
+		log.Infof("Editing spec for: %#v", taskId)
+		cmd = exec.Command("sh", "-c", fmt.Sprintf("sed -i 's/\"terminal\": true,/\"terminal\": false,/' %s", configPath))
+		err = cmd.Run()
+		if err != nil {
+			log.Infof("ERROR cmd exec %#v:", err)
+
+			log.Error(err)
+			return err
+		}
+
+		// Editing the spec for command
+		log.Infof("Editing spec for command: %s", args)
+		cmd = exec.Command("sh", "-c", fmt.Sprintf("sed -i 's;\"sh\";\"%s\";' %s", args, configPath))
+		err = cmd.Run()
+		if err != nil {
+			log.Infof("ERROR cmd exec %#v:", err)
+
+			log.Error(err)
+			return err
+		}
+	*/
+	configFile, err := os.Create(filepath.Join(taskId, "config.json"))
+	if err != nil {
+		log.Infof("ERROR create file %#v:", err)
 		log.Error(err)
 		return err
 	}
-
-	configPath := filepath.Join(taskId, "config.json")
-	// Editing the spec sed  's/\"terminal\": true,/\"terminal\": false/' config.json
-	log.Infof("Editing spec for: %#v", taskId)
-	cmd = exec.Command("sh", "-c", fmt.Sprintf("sed -i 's/\"terminal\": true,/\"terminal\": false,/' %s", configPath))
-	err = cmd.Run()
+	_, err = fmt.Fprintf(configFile, OCI_CONFIG_TEMPLATE, args)
+	configFile.Close()
 	if err != nil {
-		log.Infof("ERROR cmd exec %#v:", err)
-
-		log.Error(err)
-		return err
-	}
-
-	// Editing the spec for command
-	log.Infof("Editing spec for command: %s", args)
-	cmd = exec.Command("sh", "-c", fmt.Sprintf("sed -i 's;\"sh\";\"%s\";' %s", args, configPath))
-	err = cmd.Run()
-	if err != nil {
-		log.Infof("ERROR cmd exec %#v:", err)
-
+		log.Infof("ERROR create file %#v:", err)
 		log.Error(err)
 		return err
 	}
