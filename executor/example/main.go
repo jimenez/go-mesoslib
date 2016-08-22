@@ -104,7 +104,7 @@ func (c *client) createOCIbundleAndRun(taskId, containerImage, args string, task
 		err = cmd.Run()
 		state := mesosproto.TaskState_TASK_FINISHED
 		if err != nil {
-			log.Infof("ERROR running : $s", fmt.Sprint(err)+": "+stderr.String())
+			log.Infof("ERROR running : %s", fmt.Sprint(err)+": "+stderr.String())
 			state = mesosproto.TaskState_TASK_FAILED
 			// TODO: send status update task failed
 		}
@@ -134,7 +134,7 @@ func runcKill(taskId, containerImage string) error {
 
 func checkpointTask(data []byte) error {
 	taskId := strings.Split(fmt.Sprintf("%s", data), " ")[1]
-	cmd := exec.Command("runc", "checkpoint", "-b", taskId, "--image-path", "/criu/"+taskId, taskId)
+	cmd := exec.Command("runc", "checkpoint", "--image-path", "/criu/"+taskId, taskId)
 	var stderr bytes.Buffer
 
 	cmd.Stderr = &stderr
@@ -142,7 +142,7 @@ func checkpointTask(data []byte) error {
 	err := cmd.Run()
 
 	if err != nil {
-		log.Infof("ERROR checkpointing : $s", fmt.Sprint(err)+": "+stderr.String())
+		log.Infof("ERROR checkpointing : %s", fmt.Sprint(err)+": "+stderr.String())
 		log.Error(err)
 		return err
 	}
@@ -151,12 +151,14 @@ func checkpointTask(data []byte) error {
 
 func (c *client) handleTasks(task *mesosproto.TaskInfo, event *executorproto.Event) error {
 	c.Lock()
+	defer c.Unlock()
 	switch event.GetType() {
 	case executorproto.Event_MESSAGE:
 		data := event.GetMessage().GetData()
 		log.Infof("MESSAGE RECEIVED with: %q", data)
 		if err := checkpointTask(data); err != nil {
 			log.Errorf("Executor checkpoint error: %v", err)
+			return err
 		}
 	case executorproto.Event_LAUNCH:
 		task := event.GetLaunch().GetTask()
@@ -179,7 +181,6 @@ func (c *client) handleTasks(task *mesosproto.TaskInfo, event *executorproto.Eve
 			log.Error("Executor only supports Docker containers")
 		}
 	}
-	c.Unlock()
 	return nil
 }
 
