@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-type MasterState struct {
+type masterState struct {
 	Frameworks []struct {
 		Tasks []struct {
 			ExecutorId string `json:"executor_id"`
@@ -44,13 +44,13 @@ type MasterState struct {
 	}
 }
 
-func (m *SchedulerLib) getMasterState() (*MasterState, error) {
+func (m *SchedulerLib) getMasterState() (*masterState, error) {
 	resp, err := http.Get("http://" + m.master + "/master/state.json")
 	if err != nil {
 		return nil, err
 	}
 
-	data := new(MasterState)
+	data := new(masterState)
 
 	if err = json.NewDecoder(resp.Body).Decode(data); err != nil {
 		return nil, err

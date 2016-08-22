@@ -168,7 +168,7 @@ func (c *client) handleTasks(task *mesosproto.TaskInfo, event *executorproto.Eve
 	case executorproto.Event_LAUNCH:
 		task := event.GetLaunch().GetTask()
 		taskId := task.GetTaskId().GetValue()
-		labels := task.GetLabels().GetLabels()
+		labels := task.GetExecutor().GetLabels().GetLabels()
 		restoring := false
 		for _, label := range labels {
 			if label.GetKey() == "restore" && label.GetValue() == taskId {
